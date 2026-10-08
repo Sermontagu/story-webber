@@ -1,0 +1,1579 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Story Webber</title>
+<meta name="description" content="A free planner for novel writers: map your characters, places and secrets, track scenes and chapters, and chart character arcs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen planning board. Header (lenses, filters, search), map canvas beside an editable dossier panel, beat strip along the bottom. Phones get a bottom sheet. Deliberately a single dark theme: canon muted, drafts in neon. */
+:root{
+  color-scheme:dark;
+  --bg:#0a0c0f; --surface:#11141a; --surface-2:#181c24; --surface-3:#202632; --line:#262d39; --line-2:#343d4c;
+  --fg:#d8dce3; --muted:#7f8899; --faint:#6b7586; --dot:rgba(216,220,227,.07);
+  --person:#c7a25e; --corp:#5e9dac; --place:#8c86c6; --event:#bf6f8e; --idea:#78a685;
+  --open:#ff4438; --herring:#c7a25e; --irony:#ffd23d; --withheld:#5ad1ff;
+  --accent:#ff2bd6; --ok:#7ee08a;
+  --f-display:"Oxanium","Eurostile","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:10px;padding-inline:16px;padding-block:12px;box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+h1{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.08em;text-transform:uppercase;margin:0}
+h1 small{font-family:var(--f-mono);font-weight:400;font-size:11px;letter-spacing:.04em;color:var(--muted);text-transform:none;margin-left:8px}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:6px;overflow:hidden}
+.seg button{background:var(--surface);border:0;border-left:1px solid var(--line-2);padding:4px 10px;font:500 12px var(--f-body);cursor:pointer;color:var(--muted)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--fg);box-shadow:inset 0 -2px 0 var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 13px var(--f-body);border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px 3px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip .sw{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed="false"]{opacity:.4}
+.search{margin-left:auto;font:13px var(--f-body);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;width:170px;max-width:100%}
+
+/* main */
+main{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;min-height:0}
+.board{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;min-height:0;
+  background-image:radial-gradient(circle at 1px 1px,var(--dot) 1px,transparent 0);background-size:24px 24px}
+#graph{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#graph:active{cursor:grabbing}
+.tools{position:absolute;top:8px;left:8px;right:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none}
+.tools>*{pointer-events:auto}
+.btn{font:500 12px var(--f-body);background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--fg)}
+.btn:hover:not(:disabled){border-color:var(--fg)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.neon{border-color:var(--sc,var(--accent));color:var(--sc,var(--accent));box-shadow:0 0 10px -2px var(--sc,var(--accent))}
+.btn.danger{color:var(--open);border-color:color-mix(in srgb,var(--open) 55%,var(--line))}
+.btn.ghost{background:transparent}
+.drafting{font:500 12px var(--f-mono);color:var(--sc);border:1px solid var(--sc);border-radius:6px;padding:3px 8px;background:color-mix(in srgb,var(--sc) 10%,var(--surface));box-shadow:0 0 12px -3px var(--sc)}
+.hint{position:absolute;left:10px;bottom:8px;font:12px var(--f-mono);color:var(--faint);pointer-events:none;max-width:calc(100% - 20px)}
+.boardmsg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font:13px var(--f-mono);padding:24px;pointer-events:none}
+.boardmsg[hidden]{display:none}
+
+/* map marks */
+.lk .vis{stroke:var(--line-2);stroke-width:1.3;fill:none}
+.lk .hit{stroke:transparent;stroke-width:12;cursor:pointer}
+.lk.herring .vis{stroke:var(--herring);stroke-dasharray:1.5 4;stroke-width:2;stroke-linecap:round}
+.lk.draft .vis{stroke:var(--sc);stroke-dasharray:6 4;stroke-width:1.8;filter:drop-shadow(0 0 3px var(--sc))}
+.lk.cut .vis{stroke:var(--open);stroke-dasharray:2 6;opacity:.7}
+.lk.hl .vis{stroke:var(--fg);stroke-width:2.2}
+.lk.hl.draft .vis{stroke:var(--sc)}
+.lk.irony .vis{stroke:var(--irony);stroke-width:2.4;filter:drop-shadow(0 0 3px var(--irony))}
+.lk.withheld .vis{stroke:var(--withheld);stroke-width:2.4;filter:drop-shadow(0 0 3px var(--withheld))}
+.lab{font:10.5px var(--f-mono);fill:var(--fg);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.tip{position:absolute;z-index:5;pointer-events:none;max-width:280px;background:var(--surface-3);border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;font:12.5px/1.45 var(--f-body);box-shadow:0 8px 20px rgba(0,0,0,.45)}
+.tip[hidden]{display:none}
+.tip b{font-weight:600}
+.tip .m{display:block;font:11px var(--f-mono);color:var(--muted);margin-top:2px}
+.temp{stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3;pointer-events:none}
+.node{cursor:pointer}
+.node .core{stroke:var(--bg);stroke-width:2}
+.node.draft .core{fill:var(--bg)!important;stroke:var(--sc);stroke-width:2.5;filter:drop-shadow(0 0 5px var(--sc))}
+.node .nm{font:500 11.5px var(--f-body);fill:var(--fg);paint-order:stroke;stroke:var(--bg);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
+.node.person .nm{font-weight:600;font-size:12.5px}
+.node.draft .nm{fill:var(--sc)}
+.node .ring{fill:none;stroke:var(--fg);stroke-width:1.5;opacity:0}
+.node.sel .ring{opacity:1}
+.node.multi .ring{opacity:1;stroke:var(--accent);stroke-dasharray:3 3}
+.node.target .ring{opacity:1;stroke:var(--accent);stroke-width:3}
+.node .dot{fill:var(--open);stroke:var(--bg);stroke-width:1.5}
+.node .pinmark{fill:var(--fg);stroke:var(--bg);stroke-width:1}
+.node .handle{fill:var(--surface-3);stroke:var(--accent);stroke-width:1.5;opacity:0;cursor:crosshair;transition:opacity .15s}
+.node:hover .handle,.node.sel .handle{opacity:1}
+.node.quiet{opacity:.45}
+.node.quiet .nm{font-size:10px;fill:var(--muted)}
+.dim{opacity:.12!important}
+.faded{opacity:.06!important}
+.hide{display:none}
+
+/* panel */
+aside{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.sheetbar{display:none}
+.tabs{display:flex;gap:2px;padding:6px 6px 0;border-bottom:1px solid var(--line);flex:none;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:6px 8px 7px;font:500 13px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabs .n{font:500 10.5px var(--f-mono);margin-left:4px;color:var(--faint)}
+.tabs .n.red{color:var(--open)}
+.pbody{overflow:auto;padding:16px 18px 24px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.eyebrow{font:500 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.eyebrow .sw{width:9px;height:9px;border-radius:50%;background:var(--c)}
+h2{font-family:var(--f-display);font-weight:700;font-size:23px;letter-spacing:.02em;margin:0;line-height:1.15;text-wrap:balance}
+h3{font:600 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;align-items:center;gap:8px}
+h3 .sp{flex:1}
+p{margin:0;max-width:62ch}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.back{all:unset;cursor:pointer;font:500 12px var(--f-mono);color:var(--muted)}
+.back:hover{color:var(--fg)}
+/* editable fields: look like text until focused */
+.ed{width:100%;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:5px;color:var(--fg);font:inherit;padding:3px 6px;margin:-4px -7px;resize:none;overflow:hidden;line-height:1.5}
+.ed:hover:not(:disabled){border-color:var(--line)}
+.ed:focus{background:var(--surface-2);border-color:var(--line-2);outline:none}
+.ed:disabled{opacity:1}
+.ed.title{font-family:var(--f-display);font-weight:700;font-size:23px;line-height:1.2}
+.ed.mini{width:auto;margin:0;padding:1px 4px;font:500 11px var(--f-mono);border-color:var(--line)}
+input.ed.num{width:3.4em;text-align:center;font:500 12px var(--f-mono);margin:0;padding:1px 2px;border-color:var(--line)}
+select.ed{width:auto;margin:0;padding:1px 4px;font:500 11px var(--f-mono);border-color:var(--line);background:var(--surface)}
+.ph::placeholder,.ed::placeholder{color:var(--faint)}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:7.5em minmax(0,1fr) auto;gap:4px 10px;align-items:start}
+.row .k{font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0;padding-top:4px}
+.row .v{margin:0}
+.row.step{grid-template-columns:auto minmax(0,1fr) auto}
+.x{all:unset;cursor:pointer;color:var(--faint);font:14px var(--f-mono);padding:2px 4px;line-height:1}
+.x:hover{color:var(--open)}
+.add{all:unset;cursor:pointer;font:500 12px var(--f-mono);color:var(--muted);padding:2px 0}
+.add:hover{color:var(--accent)}
+.box{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.box.red{background:color-mix(in srgb,var(--open) 7%,var(--surface));border-color:color-mix(in srgb,var(--open) 40%,var(--line))}
+.box.red>h3{color:var(--open)}
+.box.neonbox{border-color:var(--sc);background:color-mix(in srgb,var(--sc) 6%,var(--surface));box-shadow:0 0 14px -6px var(--sc)}
+.box.note{background:color-mix(in srgb,var(--herring) 8%,var(--surface));border-color:color-mix(in srgb,var(--herring) 35%,var(--line))}
+.q{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid color-mix(in srgb,var(--open) 25%,var(--line))}
+.q:first-of-type{border-top:0;padding-top:0}
+.q .qh{display:flex;gap:8px;align-items:flex-start}
+.q .qh>span{flex:1}
+.q .qh b{display:block;font:500 11px var(--f-mono);text-transform:uppercase;color:var(--muted);letter-spacing:.05em}
+.q textarea{min-height:3.5em}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.list{display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:baseline;padding:7px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .nm{all:unset;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:6px;min-width:0}
+.item .nm:hover{color:var(--accent)}
+.item .sw{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.item .rel{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.item .b{font:11px var(--f-mono);color:var(--muted);white-space:nowrap}
+.tag{font:11.5px var(--f-mono);border:1px solid var(--line-2);border-radius:4px;padding:0 5px;color:var(--muted);white-space:nowrap}
+.tag.hr{color:var(--herring);border-color:var(--herring)}
+.tag.red{color:var(--open);border-color:var(--open)}
+.tag.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,var(--line))}
+.tag.neon{color:var(--sc);border-color:var(--sc)}
+.beatlinks{display:flex;flex-wrap:wrap;gap:6px}
+.beatlinks button{font:500 11.5px var(--f-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:2px 7px;cursor:pointer}
+.beatlinks button:hover{border-color:var(--fg)}
+.pill{display:inline-flex;align-items:center;gap:4px;font:500 12px var(--f-body);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 4px 1px 8px}
+.pill .sw{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+dl.kv{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px}
+dl.kv dt{font:500 12px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+dl.kv dd{margin:0}
+.legend{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px 10px;align-items:center;font-size:12.5px}
+.legend svg{display:block}
+.sc{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-left:3px solid var(--sc);border-radius:6px;padding:10px 12px}
+.sc.on{box-shadow:0 0 16px -8px var(--sc)}
+.sc .meta{font:11px var(--f-mono);color:var(--muted)}
+.ch{padding:8px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}
+.ch:first-child{border-top:0}
+.ch .when{font:11px var(--f-mono);color:var(--muted)}
+.ch .what{font-size:13px}
+.ch.undone .what{text-decoration:line-through;color:var(--muted)}
+.confirm{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--open)}
+.empty{color:var(--muted);font-size:13px;border:1px dashed var(--line-2);border-radius:6px;padding:12px}
+
+/* beat strip */
+footer{min-width:0;display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 14px}
+.strip-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.readout{font:600 13px var(--f-body);flex:1;min-width:0}
+.readout span{font-weight:400;color:var(--muted)}
+.acts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;font:500 10.5px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.acts span{border-top:2px solid var(--line-2);padding-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.beats{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:2px}
+.grp{min-width:calc(var(--n,1)*30px);display:flex;flex-direction:column;gap:4px}
+.gh{display:flex;align-items:center;gap:3px;border-top:2px solid var(--line-2);padding-top:2px;min-width:0}
+.gl{all:unset;box-sizing:border-box;flex:1;min-width:0;font:500 11.5px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid transparent;border-radius:3px;padding:0 3px;cursor:text}
+.gl:hover{border-color:var(--line)}
+.gl:focus{background:var(--surface-2);border-color:var(--line-2);color:var(--fg)}
+span.gl{cursor:default}
+.beats .gp,.beats .gx{all:unset;cursor:pointer;flex:none;font:600 12px var(--f-mono);color:var(--muted);padding:0 5px;border-radius:4px;border:1px solid var(--line);line-height:16px}
+.beats .gp:hover{color:var(--accent);border-color:var(--accent)}
+.beats .gx:hover{color:var(--open);border-color:var(--open)}
+.beats .addact{all:unset;cursor:pointer;flex:none;font:500 11px var(--f-mono);color:var(--muted);border:1px dashed var(--line-2);border-radius:4px;padding:3px 8px;margin-top:2px}
+.beats .addact:hover{color:var(--accent);border-color:var(--accent)}
+.beats button[data-st=idea]{box-shadow:inset 0 -3px 0 #7f8899}
+.beats button[data-st=outlined]{box-shadow:inset 0 -3px 0 #5e9dac}
+.beats button[data-st=drafted]{box-shadow:inset 0 -3px 0 #c7a25e}
+.beats button[data-st=revised]{box-shadow:inset 0 -3px 0 #7ee08a}
+.gb [data-beat]{cursor:grab;user-select:none;-webkit-user-select:none}
+.gb [data-beat].dragging{opacity:.35}
+.dragghost{position:fixed;z-index:50;pointer-events:none;background:var(--fg);color:var(--bg);font:600 12px var(--f-mono);padding:4px 8px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.35);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dropbar{position:fixed;z-index:49;width:3px;border-radius:2px;background:var(--accent);pointer-events:none;box-shadow:0 0 8px var(--accent)}
+.grp.dropto{outline:2px dashed var(--accent);outline-offset:3px;border-radius:4px}
+.prog{display:inline-flex;align-items:center;gap:10px;font:12px var(--f-mono);color:var(--muted)}
+.prog .bar{width:90px;height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;display:inline-block}
+.prog .bar i{display:block;height:100%;background:var(--ok)}
+.tpl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.tpl[hidden],.prog[hidden]{display:none}
+h1{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.titlein{all:unset;font:700 19px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--fg);border-bottom:1px dashed transparent;cursor:text;field-sizing:content;min-width:3ch;max-width:70vw;padding-right:.4em}
+.subin{all:unset;text-transform:none;font:400 11px var(--f-mono);color:var(--muted);border-bottom:1px dashed transparent;cursor:text;field-sizing:content;min-width:10ch;max-width:50vw}
+.subin::placeholder{color:var(--faint)}
+.titlein:hover,.subin:hover{border-bottom-color:var(--line-2)}
+.titlein:focus,.subin:focus{border-bottom:1px solid var(--accent)}
+header{position:relative}
+.chip.plus{border-style:dashed;color:var(--muted)}
+.chip.plus:hover{color:var(--accent);border-color:var(--accent)}
+.lensin{font:500 12px var(--f-body);background:var(--surface-2);color:var(--fg);border:1px solid var(--accent);padding:3px 6px;width:10ch;outline:none}
+.pop{position:absolute;top:100%;left:0;z-index:15;margin-top:6px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;width:min(330px,calc(100vw - 32px));box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.pop[hidden]{display:none}
+.timeline{position:absolute;inset:0;overflow:auto;padding:46px 12px 12px}
+.timeline[hidden]{display:none}
+.tl{display:grid;gap:2px;align-items:center;min-width:max-content}
+.tl .th{all:unset;cursor:pointer;font:500 11.5px var(--f-mono);color:var(--muted);text-align:center;padding:2px 0;border-radius:3px}
+.tl .th:hover{color:var(--fg)}
+.tl .th.cur{color:var(--bg);background:var(--fg)}
+.tl .ta{width:0;min-width:100%;box-sizing:border-box;font:500 10px var(--f-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-top:2px solid var(--line-2);padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl .tn{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;font:500 12px var(--f-body);position:sticky;left:0;background:var(--surface);padding:3px 8px 3px 2px;z-index:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tl .tn .sw{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.tl .tn:hover,.tl .tn.sel{color:var(--accent)}
+.tl .tc{all:unset;cursor:pointer;height:20px;border-radius:4px;background:var(--surface-2);border:1px solid transparent;box-sizing:border-box;min-width:24px}
+.tl .tc:hover{border-color:var(--fg)}
+.tl .tc.on{background:var(--c);border-color:var(--c)}
+.arcs{display:flex;flex-direction:column;gap:12px;min-width:0}
+.arcbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.arcchart{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.arcsvg{display:block}
+.arcsvg .grid{stroke:var(--line);stroke-width:1}
+.arcsvg .zero{stroke:var(--line-2);stroke-width:1.2;stroke-dasharray:4 3}
+.arcsvg .div{stroke:var(--line-2);stroke-width:1}
+.arcsvg .ax,.arcsvg .act{font:500 10.5px var(--f-mono);fill:var(--muted)}
+.arcsvg .act{text-transform:uppercase;letter-spacing:.06em}
+.arcsvg .ax.cur{fill:var(--fg);font-weight:700}
+.arcsvg .apc{fill:transparent;cursor:pointer}
+.arcsvg .apc:hover{fill:color-mix(in srgb,var(--accent) 22%,transparent)}
+.arcnote{margin:4px 0 8px;padding-left:18px;font-size:13px;line-height:1.5}
+.tl .tc.scn{opacity:.55;border:1px dashed var(--bg)}
+.tl .tc.colcur{outline:1px solid var(--fg);outline-offset:0}
+.tl .tdiv{width:0;min-width:100%;box-sizing:border-box;font:500 11px var(--f-mono);color:var(--muted);padding:10px 2px 2px;position:sticky;left:0}
+.gb{display:grid;gap:3px}
+.gb:empty{display:none}
+.beats button{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;font:500 11px var(--f-mono);font-variant-numeric:tabular-nums;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:5px 0;cursor:pointer;position:relative}
+.beats button.past{background:color-mix(in srgb,var(--fg) 12%,var(--surface-2))}
+.beats button.cur{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.beats button.span{border-color:var(--accent)}
+.beats button.plant{background:color-mix(in srgb,var(--accent) 30%,var(--surface-2));border-color:var(--accent)}
+.beats button.pay{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.beats button.flagged::after{content:"";position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--open);border:1.5px solid var(--surface)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--surface-3);border:1px solid var(--line-2);border-radius:6px;padding:8px 14px;font-size:13px;z-index:20;max-width:calc(100% - 32px)}
+
+:root[data-skin="paper"]{color-scheme:light;--bg:#f4f0e6;--surface:#fffdf8;--surface-2:#f1ece0;--surface-3:#e6dfce;--line:#ddd5c2;--line-2:#c5bba3;--fg:#2b261e;--muted:#6a6355;--faint:#8c8473;--person:#a8741f;--corp:#2f7a8c;--place:#6a62b0;--event:#a8416a;--idea:#4d8a5f;--open:#d63a2f;--herring:#a8741f;--irony:#b57d00;--withheld:#1580b3;--accent:#c2188f;--ok:#2f8f46;--dot:rgba(43,38,30,.09)}
+:root[data-skin="dusk"]{color-scheme:dark;--bg:#13111d;--surface:#1b1829;--surface-2:#242036;--surface-3:#2e2944;--line:#342f4d;--line-2:#463f68;--fg:#e6e1f6;--muted:#9d96bc;--faint:#7a739c;--accent:#ffb454;--dot:rgba(230,225,246,.06)}
+:root[data-skin="paper"] .toast,:root[data-skin="paper"] .pop,:root[data-skin="paper"] .tip{box-shadow:0 8px 24px rgba(60,50,30,.18)}
+.sec{border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.sec>summary{cursor:pointer;list-style:none;padding:9px 12px;font:600 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary::before{content:"▸";font-size:11px;transition:transform .15s}
+.sec[open]>summary::before{transform:rotate(90deg)}
+.sec>summary:hover{color:var(--fg)}
+.sec>summary .n{margin-left:auto;font:500 12px var(--f-mono);color:var(--faint)}
+.secb{padding:2px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.start{border:1px solid var(--accent);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.start h3{color:var(--accent);margin:0}
+.step{display:grid;grid-template-columns:22px minmax(0,1fr);gap:2px 8px;align-items:start}
+.step .tick{font:600 13px var(--f-mono);color:var(--faint);line-height:1.5}
+.step.done .tick{color:var(--ok)}
+.step.done b{color:var(--muted);font-weight:500;text-decoration:line-through}
+.step b{font-weight:600}
+.step .more{grid-column:2;display:flex;flex-direction:column;gap:6px}
+#skinbtn{white-space:nowrap}
+
+@media (max-width:860px){
+  .app{padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+  main{grid-template-columns:1fr}
+  .search{margin-left:0;flex:1 1 150px;width:auto}
+  .strip-top .eyebrow{display:none}
+  .readout{flex:1 1 100%}
+  .gl{font-size:9px}
+  .beats button{padding:6px 0;font-size:10px}
+  aside{position:fixed;left:0;right:0;bottom:0;z-index:10;border-radius:12px 12px 0 0;max-height:72vh;height:56px;transition:height .2s;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -10px 30px rgba(0,0,0,.5)}
+  aside.open{height:72vh}
+  .sheetbar{display:flex;align-items:center;gap:10px;padding:10px 16px;flex:none;border:0;background:none;width:100%;text-align:left;cursor:pointer}
+  .sheetbar::before{content:"";width:36px;height:4px;border-radius:2px;background:var(--line-2);position:absolute;left:50%;top:5px;transform:translateX(-50%)}
+  .sheetbar b{font-family:var(--f-display);font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header>
+    <h1><input class="titlein" id="storytitle" aria-label="Story title (click to rename)" maxlength="80" spellcheck="false"><input class="subin" id="storysub" placeholder="+ subtitle" aria-label="Subtitle" maxlength="80" spellcheck="false"></h1>
+    <div class="seg" id="lens" role="group" aria-label="Knowledge lens"></div>
+    <div class="chips" id="chips"></div>
+    <input class="search" id="search" type="search" placeholder="Find a name…" aria-label="Find a node">
+    <button class="btn" id="skinbtn"></button>
+    <div class="pop" id="pop" hidden></div>
+  </header>
+  <main>
+    <div class="board" id="board">
+      <svg id="graph" role="img" aria-label="Story web"></svg>
+      <div class="timeline" id="timeline" hidden></div>
+      <div class="tools" id="tools"></div>
+      <div class="hint">Hover to spotlight · hover a line to read it · drag to pin, double-click to unpin · pink handle connects · shift-click multi-selects</div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="boardmsg" id="boardmsg">Loading the story web…</div>
+    </div>
+    <aside id="panel">
+      <button class="sheetbar" id="sheetbar" aria-expanded="false"><b id="sheettitle">Story web</b><span class="muted small">tap to open</span></button>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="pbody" id="pbody" aria-live="polite"></div>
+    </aside>
+  </main>
+  <footer>
+    <div class="strip-top">
+      <span class="eyebrow">Story so far</span>
+      <span class="readout" id="readout"></span>
+      <button class="add" id="unitedit" title="Rename these, for example to chapters" aria-label="Rename the sections of your story">✎</button><input class="lensin" id="unitin" hidden maxlength="20" aria-label="What do you call each section?">
+      <span class="prog" id="prog" hidden></span>
+      <button class="btn" id="allbtn">Show all beats</button>
+    </div>
+    <div class="tpl" id="tpl" hidden></div>
+    <div class="beats" id="beats"></div>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+/* ============ constants & state ============ */
+const COLLS=["nodes","links","beats","questions","scenarios","clues","changes","settings","scenes","arcpts"];
+const S={};COLLS.forEach(c=>S[c]=new Map());
+/* ============ CONFIG: edit this block to make the web your own ============ */
+const CONFIG={
+  title:"Story Webber",                 // shown in the header and browser tab
+  subtitle:"",                          // small text beside the title, e.g. "story web · London, 2353". "" hides it
+  intro:{eyebrow:"",heading:"Who knows what, and when"},   // heading block at the top of the Story tab
+  background:[],                        // rows for the Story tab, e.g. [["Setting","A city under the sea"],["Now","The Crown is a figurehead"]]
+  beatCount:20,                         // number of beats on the bottom strip
+  // Starting node types: [key, name, colour]. Writers can add, rename, recolour and remove these in the app (Setup tab).
+  types:[["person","Character","#c7a25e"],["place","Place","#8c86c6"],["corp","Group","#5e9dac"],["event","Event","#bf6f8e"],["idea","Idea","#78a685"]],
+  // Acts for the bottom bar: [key, label]. Beats are assigned to a key.
+  acts:[["1","Act 1"],["2","Act 2"],["3","Act 3"]],
+  // Truth filter tabs: [key, label, description]. Keep "truth" as the first one.
+  reader:"Reader",                      // name of the "what the reader knows" view. Editable in Setup
+  pov:"Character",                       // name of the viewpoint character, used for the second knowledge view. Editable in Setup
+  neon:["#ff2bd6","#22e4ff","#c6ff3d","#ffb020","#9d7bff","#ff6b3d"]
+};
+const BASE=JSON.parse(JSON.stringify({title:CONFIG.title,subtitle:CONFIG.subtitle,eyebrow:CONFIG.intro.eyebrow,heading:CONFIG.intro.heading,acts:CONFIG.acts,types:CONFIG.types,pov:CONFIG.pov,reader:CONFIG.reader,background:CONFIG.background}));
+const TYPE_PALETTE=["#c7a25e","#5e9dac","#8c86c6","#bf6f8e","#78a685","#d98c5f","#6fa8dc","#b5a642","#a67db8","#e06c75","#4fb3a5","#9aa5b1"];
+const NEON=CONFIG.neon;
+const plural=w=>/(s|x|z|ch|sh)$/i.test(w)?w+"es":/[^aeiou]y$/i.test(w)?w.slice(0,-1)+"ies":w+"s";
+let UN={};
+function setUnit(name){const t=(name||"").trim()||"Beat";const one=t[0].toUpperCase()+t.slice(1);UN={one,many:plural(one),l1:one.toLowerCase(),lm:plural(one).toLowerCase()}}
+setUnit("Beat");
+const buildLenses=(p,r)=>{const rd=r==="Reader"?"the reader":r;return [["truth","Truth","Everything that is true, regardless of who knows it"],["character",p,`What ${p} knows by the selected ${UN.l1}`],["reader",r,`What ${rd} knows by the selected ${UN.l1}`],["gaps","Gaps",`Yellow: ${rd} knows and ${p} doesn't. Blue: ${p} knows and ${rd} doesn't.`]]};
+let LENSES=buildLenses(CONFIG.pov,CONFIG.reader);
+let TYPES={};
+const normTypes=a=>Object.fromEntries((a||[]).map(t=>Array.isArray(t)?t:[t.key,t.name,t.color]).filter(t=>t[0]).map(([k,n,c])=>[k,{label:n,one:n,color:c||"#9aa5b1"}]));
+TYPES=normTypes(BASE.types);
+let ACTS=Object.fromEntries(CONFIG.acts);
+const loaded=new Set();
+let db=null,canWrite=true,dbFailed=false,isLocal=false;
+
+const pref=(()=>{try{return JSON.parse(localStorage.getItem("mw-prefs")||"{}")}catch(e){return{}}})();
+const ui={view:"tab",tab:"story",sel:null,link:null,beatView:null,clue:null,beat:null,
+  board:["timeline","arcs"].includes(pref.board)?pref.board:"web",sec:{},hideStart:!!pref.hideStart,skin:["noir","paper","dusk"].includes(pref.skin)?pref.skin:(matchMedia("(prefers-color-scheme: light)").matches?"paper":"noir"),lens:LENSES.some(l=>l[0]===pref.lens)?pref.lens:"truth",offTypes:new Set(),multi:new Set(),focus:null,
+  hidden:new Set(pref.hidden||[]),draftInto:pref.draftInto||null,q:"",confirm:null,deciding:null,
+  hover:null,hoverLink:null,sheet:false,focusField:null};
+function savePref(){try{localStorage.setItem("mw-prefs",JSON.stringify({hidden:[...ui.hidden],draftInto:ui.draftInto,lens:ui.lens,board:ui.board,hideStart:ui.hideStart,skin:ui.skin}))}catch(e){}}
+
+/* ============ helpers ============ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+applySettings();
+const SKINS=[["noir","Noir"],["paper","Paper"],["dusk","Dusk"]];
+function applySkin(){document.documentElement.dataset.skin=ui.skin;const b=$("skinbtn");b.textContent="◐ "+SKINS.find(x=>x[0]===ui.skin)[1];b.title="Change the look";try{if(loaded.size>=COLLS.length)schedule()}catch(e){}}
+$("skinbtn").onclick=()=>{const i=SKINS.findIndex(x=>x[0]===ui.skin);ui.skin=SKINS[(i+1)%SKINS.length][0];savePref();applySkin()};
+applySkin();
+const clone=o=>o==null?null:JSON.parse(JSON.stringify(o));
+const strip=o=>{if(!o)return null;const {id,...r}=o;return clone(r)};
+const norm=o=>{if(!o)return null;const {x,y,pinned,...r}=o;return JSON.stringify(r)};
+const newId=p=>p+"-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const firstType=()=>Object.keys(TYPES)[0];
+const col=t=>(TYPES[t]||Object.values(TYPES)[0]||{color:"#9aa5b1"}).color;
+const nm=id=>S.nodes.get(id)?.name||"(deleted)";
+const scen=id=>S.scenarios.get(id);
+const PAPER_INK={"#ff2bd6":"#b5139a","#22e4ff":"#0b7d96","#c6ff3d":"#5d8a00","#ffb020":"#a86400","#9d7bff":"#5b3fc4","#ff6b3d":"#c13c12"};
+const ink=c=>document.documentElement.dataset.skin==="paper"?(PAPER_INK[String(c).toLowerCase()]||c):c;
+const scColor=id=>ink(scen(id)?.color||"#ff2bd6");
+const shownDraft=x=>!x.draft||(S.scenarios.has(x.draft)&&!ui.hidden.has(x.draft));
+const beatDoc=n=>S.beats.get("b"+String(n).padStart(2,"0"));
+const beatsSorted=()=>[...S.beats.values()].sort((a,b)=>a.n-b.n);
+const openQs=()=>[...S.questions.values()].filter(q=>q.status!=="decided");
+const openQFor=id=>openQs().filter(q=>q.node===id);
+const RO=()=>canWrite&&db?"":"disabled";
+const fmtDate=t=>{const d=new Date(t);return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})};
+const bnum=v=>{if(v===""||v==null)return null;const n=Math.round(+v);return isNaN(n)?null:Math.max(0,Math.min(CONFIG.beatCount,n))};
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3200)}
+function handleErr(e){
+  const c=e&&e.code;
+  if(c==="invalid_argument"&&!canWrite){toast("You can view this web but not edit it.")}
+  else if(c==="quota_exceeded")toast("The story database is full. Clear some history to keep editing.");
+  else if(c==="revoked"||c==="not_granted"){canWrite=false;toast("Editing isn't available in this view.")}
+  else toast("That change didn't save. Try again in a moment.");
+}
+function clueFlags(c){const f=[];if(c.planted==null)f.push("Nothing planted");if(c.payoff==null)f.push("No payoff");if(c.planted!=null&&c.payoff!=null&&c.payoff<c.planted)f.push("Pays off before it's planted");return f}
+
+/* ============ writes ============ */
+async function commit(summary,items,opts={}){
+  if(!db||!canWrite){toast("Editing isn't available in this view.");return false}
+  const rec=[];
+  try{
+    for(const it of items){
+      const before=strip(S[it.coll].get(it.id));
+      const after=it.after?clone(it.after):null;
+      const ref=db.doc(it.coll+"/"+it.id);
+      if(after)await ref.set(after);else if(before)await ref.delete();else continue;
+      rec.push({coll:it.coll,id:it.id,before,after});
+    }
+    if(!rec.length)return true;
+    const draft=opts.draft??rec.every(r=>r.coll==="scenarios"||!!(r.after||r.before||{}).draft);
+    await db.collection("changes").doc(newId("ch")).set({at:Date.now(),by:"you",summary,items:rec,draft,synced:opts.synced??draft,undone:false});
+    return true;
+  }catch(e){if(e&&e.code==="invalid_argument")canWrite=false;handleErr(e);renderPanel(true);return false}
+}
+function patch(coll,id,fields,summary){
+  const cur=strip(S[coll].get(id));if(!cur)return;
+  const after={...cur,...fields};
+  if(norm(after)===norm(cur))return;
+  return commit(summary,[{coll,id,after}]);
+}
+async function undo(chId){
+  const ch=S.changes.get(chId);if(!ch||ch.undone)return;
+  const ok=await commit("Undid: "+ch.summary,[...ch.items].reverse().map(it=>({coll:it.coll,id:it.id,after:it.before})),{draft:ch.draft,synced:ch.draft||!ch.synced});
+  if(ok){try{await db.doc("changes/"+chId).update({undone:true,synced:ch.synced||ch.draft})}catch(e){handleErr(e)}}
+}
+const canUndo=ch=>!ch.undone&&ch.items.every(it=>norm(strip(S[it.coll].get(it.id)))===norm(it.after));
+
+/* ============ graph ============ */
+const svg=d3.select("#graph");
+const root=svg.append("g");
+const gLinks=root.append("g"),gLabs=root.append("g");
+const temp=root.append("line").attr("class","temp hide");
+const gNodes=root.append("g");
+const zoom=d3.zoom().scaleExtent([.2,3]).on("zoom",e=>root.attr("transform",e.transform));
+svg.call(zoom).on("dblclick.zoom",null);
+svg.on("click",e=>{if(e.target===svg.node()){ui.multi.clear();if(ui.view!=="tab"){ui.view="tab"}ui.confirm=null;renderAll()}});
+
+const simMap=new Map();let simNodes=[],simLinks=[],nodeSel=null,linkSel=null,labSel=null,lastSig="",dragging=null,moved=false,connTarget=null;
+const W=()=>svg.node().clientWidth||800,H=()=>svg.node().clientHeight||600;
+function clusterOf(t){const ks=Object.keys(TYPES),i=ks.indexOf(t);if(ks.length<2||i<0)return[0,0];const a=-Math.PI/2+i*2*Math.PI/ks.length;return[.26*Math.cos(a),.24*Math.sin(a)]}
+const degree=new Map();
+const rad=o=>{const d=o.d;const base=10;const r=base+Math.min(degree.get(o.id)||0,12)*.55;return d.minor?Math.max(6,r*.7):r};
+const sim=d3.forceSimulation().alphaDecay(.03)
+  .force("link",d3.forceLink().id(d=>d.id).distance(l=>l.d.draft?120:100).strength(.4))
+  .force("charge",d3.forceManyBody().strength(-520).distanceMax(600))
+  .force("collide",d3.forceCollide(o=>rad(o)+22))
+  .force("x",d3.forceX(o=>W()*clusterOf(o.d.t)[0]).strength(.045))
+  .force("y",d3.forceY(o=>H()*clusterOf(o.d.t)[1]).strength(.045))
+  .on("tick",tick);
+sim.stop();
+function tick(){
+  if(!nodeSel)return;
+  linkSel.selectAll("line").attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+  labSel.attr("x",d=>(d.source.x+d.target.x)/2).attr("y",d=>(d.source.y+d.target.y)/2-3);
+  nodeSel.attr("transform",d=>`translate(${d.x},${d.y})`);
+}
+function seedPos(n){
+  if(n.pinned&&n.x!=null)return{x:n.x,y:n.y};
+  const nb=[...S.links.values()].filter(l=>l.s===n.id||l.t===n.id).map(l=>simMap.get(l.s===n.id?l.t:l.s)).filter(o=>o&&o.x!=null);
+  if(nb.length)return{x:d3.mean(nb,o=>o.x)+(Math.random()-.5)*40,y:d3.mean(nb,o=>o.y)+(Math.random()-.5)*40};
+  return{x:W()*clusterOf(n.t)[0]+(Math.random()-.5)*80,y:H()*clusterOf(n.t)[1]+(Math.random()-.5)*80};
+}
+function rebuild(){
+  const ns=[...S.nodes.values()].filter(shownDraft);
+  const ids=new Set(ns.map(n=>n.id));
+  simNodes=ns.map(n=>{
+    let o=simMap.get(n.id);
+    if(!o){o={id:n.id,...seedPos(n)};simMap.set(n.id,o)}
+    o.d=n;
+    if(o!==dragging){if(n.pinned&&n.x!=null){o.fx=n.x;o.fy=n.y}else if(!o.localPin){o.fx=null;o.fy=null}}
+    return o;
+  });
+  const ls=[...S.links.values()].filter(l=>shownDraft(l)&&ids.has(l.s)&&ids.has(l.t));
+  degree.clear();ls.forEach(l=>{degree.set(l.s,(degree.get(l.s)||0)+1);degree.set(l.t,(degree.get(l.t)||0)+1)});
+  simLinks=ls.map(l=>({id:l.id,source:simMap.get(l.s),target:simMap.get(l.t),d:l}));
+
+  linkSel=gLinks.selectAll("g.lk").data(simLinks,d=>d.id).join(enter=>{
+    const g=enter.append("g").attr("class","lk");
+    g.append("line").attr("class","vis");g.append("line").attr("class","hit");
+    g.on("click",(e,d)=>{e.stopPropagation();openLink(d.id)})
+     .on("mouseenter",(e,d)=>{ui.hoverLink=d.id;paint();showTip(linkTip(d.d),e)}).on("mousemove",e=>moveTip(e)).on("mouseleave",()=>{ui.hoverLink=null;paint();hideTip()});
+    return g});
+  linkSel.attr("class",d=>"lk"+(d.d.k==="herring"?" herring":"")+(d.d.draft?" draft":"")).style("--sc",d=>d.d.draft?scColor(d.d.draft):null);
+  labSel=gLabs.selectAll("text").data(simLinks,d=>d.id).join("text").attr("class","lab hide").attr("text-anchor","middle");
+
+  nodeSel=gNodes.selectAll("g.node").data(simNodes,d=>d.id).join(enter=>{
+    const g=enter.append("g").attr("tabindex",0).attr("role","button");
+    g.append("circle").attr("class","ring");g.append("circle").attr("class","core");
+    g.append("circle").attr("class","dot").attr("r",4.5);
+    g.append("circle").attr("class","pinmark").attr("r",2.6);
+    g.append("text").attr("class","nm").attr("text-anchor","middle");
+    g.append("circle").attr("class","handle").attr("r",5);
+    g.on("click",nodeClick).on("dblclick",nodeDbl)
+     .on("keydown",(e,d)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();nodeClick(e,d)}})
+     .on("mouseenter",(e,d)=>{ui.hover=d.id;paint();
+       if(ui.view==="node"&&ui.sel&&ui.sel!==d.id){const l=[...S.links.values()].find(x=>shownDraft(x)&&((x.s===ui.sel&&x.t===d.id)||(x.t===ui.sel&&x.s===d.id)));if(l)showTip(linkTip(l),e)}})
+     .on("mousemove",e=>moveTip(e)).on("mouseleave",()=>{ui.hover=null;paint();hideTip()});
+    g.call(nodeDrag);g.select(".handle").call(connDrag);
+    return g});
+  nodeSel.attr("class",d=>"node "+d.d.t+(d.d.draft?" draft":"")).attr("aria-label",d=>d.d.name)
+    .style("--sc",d=>d.d.draft?scColor(d.d.draft):null);
+  nodeSel.select(".core").attr("r",rad).style("fill",d=>col(d.d.t));
+  nodeSel.select(".ring").attr("r",d=>rad(d)+4);
+  nodeSel.select(".dot").attr("cx",d=>rad(d)*.75).attr("cy",d=>-rad(d)*.75);
+  nodeSel.select(".pinmark").attr("cx",d=>-rad(d)*.75).attr("cy",d=>-rad(d)*.75);
+  nodeSel.select(".handle").attr("cx",d=>rad(d)+7).attr("cy",0);
+  nodeSel.select(".nm").attr("dy",d=>rad(d)+13).text(d=>d.d.name);
+
+  sim.nodes(simNodes);sim.force("link").links(simLinks);
+  const sig=[...ids].sort().join()+"|"+ls.map(l=>l.id+l.s+l.t).sort().join();
+  if(sig!==lastSig){
+    if(!lastSig){for(let i=0;i<320;i++)sim.tick();tick();fit(false);sim.alpha(.05).restart()}
+    else sim.alpha(.35).restart();
+    lastSig=sig;
+  }else tick();
+  paint();
+}
+function fit(anim=true){
+  const vis=simNodes.filter(o=>!o.hidden);if(!vis.length)return;
+  const w=W(),h=H(),pad=50;
+  const x0=d3.min(vis,o=>o.x),x1=d3.max(vis,o=>o.x),y0=d3.min(vis,o=>o.y),y1=d3.max(vis,o=>o.y);
+  const k=Math.min(1.4,.95*Math.min((w-pad*2)/(x1-x0||1),(h-pad*2)/(y1-y0||1)));
+  const t=d3.zoomIdentity.translate(w/2-k*(x0+x1)/2,h/2-k*(y0+y1)/2+10).scale(k);
+  (anim?svg.transition().duration(450):svg).call(zoom.transform,t);
+}
+const nodeDrag=d3.drag()
+  .filter(e=>!e.button&&!(e.target.classList&&e.target.classList.contains("handle")))
+  .on("start",(e,d)=>{dragging=d;moved=false;d.fx=d.x;d.fy=d.y})
+  .on("drag",(e,d)=>{if(!moved){moved=true;sim.alphaTarget(.12).restart()}d.fx=e.x;d.fy=e.y})
+  .on("end",(e,d)=>{sim.alphaTarget(0);dragging=null;
+    if(moved){d.fx=e.x;d.fy=e.y;d.localPin=true;
+      if(db&&canWrite)db.doc("nodes/"+d.id).update({x:Math.round(e.x),y:Math.round(e.y),pinned:true}).catch(handleErr);
+      paint();
+    }else if(!d.d.pinned&&!d.localPin){d.fx=null;d.fy=null}});
+const connDrag=d3.drag()
+  .on("start",(e,d)=>{e.sourceEvent.stopPropagation();temp.classed("hide",false).attr("x1",d.x).attr("y1",d.y).attr("x2",d.x).attr("y2",d.y)})
+  .on("drag",(e,d)=>{const [x,y]=d3.pointer(e.sourceEvent,root.node());temp.attr("x2",x).attr("y2",y);
+    const t=simNodes.find(o=>o.id!==d.id&&!o.hidden&&Math.hypot(o.x-x,o.y-y)<rad(o)+10);connTarget=t?t.id:null;
+    nodeSel.classed("target",o=>o.id===connTarget)})
+  .on("end",(e,d)=>{temp.classed("hide",true);nodeSel.classed("target",false);const t=connTarget;connTarget=null;if(t)createLink(d.id,t)});
+function nodeClick(e,d){
+  e.stopPropagation();
+  if(e.shiftKey){ui.multi.has(d.id)?ui.multi.delete(d.id):ui.multi.add(d.id);renderTools();paint();return}
+  openNode(d.id);
+}
+function nodeDbl(e,d){
+  e.stopPropagation();d.localPin=false;d.fx=null;d.fy=null;sim.alpha(.2).restart();
+  if(d.d.pinned&&db&&canWrite)db.doc("nodes/"+d.id).update({pinned:false}).catch(handleErr);
+  paint();
+}
+
+/* ============ tooltip ============ */
+const tip=$("tip");
+function linkTip(l){const lim=ui.beat??CONFIG.beatCount;return `<b>${esc(nm(l.s))} → ${esc(nm(l.t))}</b><br>${esc(linkText(l,lim))}<span class="m">${(l.steps||[]).map(s=>s.b?UN.one[0]+s.b:"world").join(" · ")}${l.k==="herring"?" · red herring":""}${l.draft?" · draft":""}</span>`}
+function showTip(html,e){tip.innerHTML=html;tip.hidden=false;moveTip(e)}
+function moveTip(e){if(tip.hidden)return;const r=$("board").getBoundingClientRect();let x=e.clientX-r.left+14,y=e.clientY-r.top+14;const w=tip.offsetWidth,h=tip.offsetHeight;if(x+w>r.width-8)x=e.clientX-r.left-w-14;if(y+h>r.height-8)y=e.clientY-r.top-h-14;tip.style.left=Math.max(8,x)+"px";tip.style.top=Math.max(8,y)+"px"}
+function hideTip(){tip.hidden=true}
+
+/* ============ paint (classes only) ============ */
+function linkText(l,lim){const st=(l.steps||[]).filter(s=>s.b<=lim);const s=st.length?st[st.length-1]:(l.steps||[])[0];return s?s.text:""}
+function gapOf(l,lim){const m=l.m!=null&&l.m<=lim,r=l.r!=null&&l.r<=lim;return m===r?null:(r?"irony":"withheld")}
+function paint(){
+  renderBoardMode();
+  if(ui.board!=="web"){renderStrip();return}
+  if(!nodeSel)return;
+  const lim=ui.beat??CONFIG.beatCount,lens=ui.lens;
+  const linkKnown=l=>{if(lens==="truth"||lens==="gaps")return true;const v=lens==="reader"?l.d.r:l.d.m;return v!=null&&v<=lim};
+  const nodeKnown=o=>lens==="truth"||lens==="gaps"||(o.d.beat??0)<=lim;
+  let fv=null;
+  if(ui.focus){fv=new Set(ui.focus);simLinks.forEach(l=>{if(ui.focus.has(l.source.id))fv.add(l.target.id);if(ui.focus.has(l.target.id))fv.add(l.source.id)})}
+  simNodes.forEach(o=>o.hidden=ui.offTypes.has(o.d.t)||(fv&&!fv.has(o.id)));
+  let hl=null,hlLink=null;
+  if(ui.q){const q=ui.q.toLowerCase();hl=new Set(simNodes.filter(o=>o.d.name.toLowerCase().includes(q)).map(o=>o.id))}
+  else if(ui.view==="node"&&ui.sel){hl=new Set([ui.sel]);simLinks.forEach(l=>{if(l.source.id===ui.sel)hl.add(l.target.id);if(l.target.id===ui.sel)hl.add(l.source.id)});hlLink=l=>l.source.id===ui.sel||l.target.id===ui.sel}
+  else if(ui.view==="link"&&ui.link&&S.links.get(ui.link)){const L=S.links.get(ui.link);hl=new Set([L.s,L.t]);hlLink=l=>l.id===ui.link}
+  else if(ui.view==="clue"&&ui.clue&&S.clues.get(ui.clue)){hl=new Set(S.clues.get(ui.clue).nodes||[]);hlLink=l=>hl.has(l.source.id)&&hl.has(l.target.id)}
+  else if(ui.beat!=null&&beatDoc(ui.beat)){hl=new Set(beatDoc(ui.beat).ids||[]);hlLink=l=>(l.d.steps||[]).some(s=>s.b===ui.beat)&&hl.has(l.source.id)&&hl.has(l.target.id)}
+  else if(ui.view==="tab"&&ui.tab==="questions"){hl=new Set(openQs().map(q=>q.node).filter(Boolean))}
+  else if(ui.view==="tab"&&ui.tab==="whatifs"){hl=new Set(simNodes.filter(o=>o.d.draft).map(o=>o.id));simLinks.forEach(l=>{if(l.d.draft){hl.add(l.source.id);hl.add(l.target.id)}});hlLink=l=>!!l.d.draft}
+  if(lens==="gaps"&&!hlLink){const g=simLinks.filter(l=>gapOf(l.d,lim));hl=hl||new Set();g.forEach(l=>{hl.add(l.source.id);hl.add(l.target.id)});hlLink=l=>!!gapOf(l.d,lim)}
+  if(ui.hover&&!ui.q&&!hl){const h=ui.hover;hl=new Set([h]);simLinks.forEach(l=>{if(l.source.id===h)hl.add(l.target.id);if(l.target.id===h)hl.add(l.source.id)});hlLink=l=>l.source.id===h||l.target.id===h}
+  const cuts=new Set();S.scenarios.forEach((s,id)=>{if(!ui.hidden.has(id))(s.cuts||[]).forEach(c=>cuts.add(c))});
+  const touchHover=l=>ui.hover&&(l.source.id===ui.hover||l.target.id===ui.hover);
+  nodeSel.classed("hide",o=>o.hidden)
+    .classed("faded",o=>!nodeKnown(o))
+    .classed("dim",o=>nodeKnown(o)&&hl&&!hl.has(o.id))
+    .classed("sel",o=>ui.view==="node"&&o.id===ui.sel)
+    .classed("multi",o=>ui.multi.has(o.id))
+    .classed("quiet",o=>o.d.minor&&!(hl&&hl.has(o.id))&&ui.hover!==o.id&&!(fv&&fv.has(o.id)));
+  nodeSel.select(".dot").attr("display",o=>openQFor(o.id).length?null:"none");
+  nodeSel.select(".pinmark").attr("display",o=>(o.d.pinned||o.localPin)?null:"none");
+  linkSel.classed("hide",l=>l.source.hidden||l.target.hidden)
+    .classed("faded",l=>!linkKnown(l))
+    .classed("dim",l=>linkKnown(l)&&!!hl&&!(hlLink&&hlLink(l))&&!touchHover(l)&&ui.hoverLink!==l.id)
+    .classed("hl",l=>ui.hoverLink===l.id||!!(hlLink&&hlLink(l)&&lens!=="gaps"))
+    .classed("irony",l=>lens==="gaps"&&gapOf(l.d,lim)==="irony")
+    .classed("withheld",l=>lens==="gaps"&&gapOf(l.d,lim)==="withheld")
+    .classed("cut",l=>cuts.has(l.id));
+  labSel.text(l=>linkText(l.d,lim)).classed("hide",l=>l.source.hidden||l.target.hidden||!(ui.view==="link"&&l.id===ui.link));
+  renderStrip();
+}
+
+/* ============ header, tools, strip ============ */
+function renderLens(){
+  const el=$("lens");
+  const sig=JSON.stringify(LENSES);
+  if(el.dataset.sig!==sig||!el.querySelector("[data-lens]")){el.dataset.sig=sig;
+    el.innerHTML=LENSES.map(([k,l,t])=>`<button data-lens="${k}" title="${esc(t)}${k==="character"||k==="reader"?" (double-click to rename)":""}">${esc(l)}</button>`).join("")}
+  el.querySelectorAll("[data-lens]").forEach(b=>b.setAttribute("aria-pressed",ui.lens===b.dataset.lens));
+}
+$("lens").onclick=e=>{const b=e.target.closest("[data-lens]");if(!b)return;ui.lens=b.dataset.lens;savePref();renderLens();paint();if(ui.view==="tab"&&ui.tab==="story")renderPanel(true)};
+function renderChips(){
+  const used=new Set([...S.nodes.values()].filter(shownDraft).map(n=>n.t));
+  $("chips").innerHTML=Object.entries(TYPES).filter(([k])=>used.has(k)).map(([k,v])=>`<button class="chip" data-type="${k}" style="--c:${v.color}" aria-pressed="${!ui.offTypes.has(k)}"><span class="sw"></span>${esc(v.label)}</button>`).join("")+`<button class="chip plus" data-addtype title="Add a new kind of node, with its own colour" ${RO()}>+ Type</button>`;
+}
+$("chips").onclick=e=>{if(e.target.closest("[data-addtype]")){openTypePop(e.target.closest("[data-addtype]"));return}const b=e.target.closest("[data-type]");if(!b)return;const k=b.dataset.type;ui.offTypes.has(k)?ui.offTypes.delete(k):ui.offTypes.add(k);renderChips();paint()};
+function renderTools(){
+  const tlm=ui.board!=="web";
+  let h=`<span class="seg" role="group" aria-label="Board view"><button data-tool="web" aria-pressed="${!tlm}">Web</button><button data-tool="timeline" aria-pressed="${ui.board==="timeline"}">Timeline</button><button data-tool="arcs" aria-pressed="${ui.board==="arcs"}">Arcs</button></span><button class="btn" data-tool="add" ${RO()}>+ Node</button>`;
+  if(!tlm)h+=`<button class="btn" data-tool="tidy">Tidy</button><button class="btn" data-tool="fit">Re-centre</button>`;
+  if(!tlm&&ui.multi.size)h+=`<button class="btn neon" data-tool="focus">Focus on ${ui.multi.size}</button><button class="btn ghost" data-tool="clearmulti">Clear selection</button>`;
+  if(!tlm&&ui.focus)h+=`<span class="drafting" style="--sc:var(--fg)">Focus: ${esc([...ui.focus].map(nm).join(", "))}</span><button class="btn" data-tool="exitfocus">Exit focus</button>`;
+  if(ui.draftInto&&scen(ui.draftInto))h+=`<span class="drafting" style="--sc:${scColor(ui.draftInto)}">Drafting into: ${esc(scen(ui.draftInto).name)}</span><button class="btn ghost" data-tool="stopdraft">Stop drafting</button>`;
+  $("tools").innerHTML=h;
+}
+$("tools").onclick=e=>{const b=e.target.closest("[data-tool]");if(!b)return;const t=b.dataset.tool;
+  if(t==="add")addNode();
+  if(t==="web"||t==="timeline"||t==="arcs"){ui.board=t;savePref();renderTools();paint();if(t==="web")setTimeout(()=>fit(),30)}
+  if(t==="tidy"){simNodes.forEach(o=>{if(!o.d.pinned&&!o.localPin){o.fx=null;o.fy=null}});sim.alpha(.9).restart()}
+  if(t==="fit")fit();
+  if(t==="focus"){ui.focus=new Set(ui.multi);ui.multi.clear();renderTools();paint();setTimeout(()=>fit(),30)}
+  if(t==="clearmulti"){ui.multi.clear();renderTools();paint()}
+  if(t==="exitfocus"){ui.focus=null;renderTools();paint();setTimeout(()=>fit(),30)}
+  if(t==="stopdraft"){ui.draftInto=null;savePref();renderAll()}
+};
+function renderStrip(){
+  const bs=beatsSorted();
+  const el=$("beats");
+  const groups=CONFIG.acts.map(([k,l],i)=>({k,i,l,bs:bs.filter(b=>b.act===k)}));
+  const loose=bs.filter(b=>!CONFIG.acts.some(a=>a[0]===b.act));
+  if(loose.length)groups.push({k:null,i:-1,l:groups.length?"No act":"",bs:loose});
+  const sig=JSON.stringify([groups.map(g=>[g.k,g.l,g.bs.map(b=>b.n)]),canWrite&&!!db]);
+  if(el.dataset.sig!==sig){el.dataset.sig=sig;
+    el.innerHTML=groups.map(g=>`<div class="grp" ${g.k!=null?`data-k="${esc(g.k)}"`:""} style="flex:${Math.max(g.bs.length,1)} 1 0;--n:${Math.max(g.bs.length,2)}"><div class="gh">${g.k==null?`<span class="gl">${esc(g.l)}</span>`:`<input class="gl" data-actname="${g.i}" value="${esc(g.l)}" title="Click to rename this act" aria-label="Act name" ${RO()}>`}${g.k!=null&&!g.bs.length?`<button class="gx" data-delact="${g.i}" title="Remove this empty act" ${RO()}>×</button>`:""}${g.k!=null?`<button class="gp" data-addbeat="${esc(g.k)}" title="Add a ${UN.l1} to ${esc(g.l)}" ${RO()}>+</button>`:""}</div><div class="gb" style="grid-template-columns:repeat(${Math.max(g.bs.length,1)},minmax(0,1fr))">${g.bs.map(b=>`<button data-beat="${b.n}">${b.n}</button>`).join("")}</div></div>`).join("")+`<button class="addact" data-addact title="Add an act" ${RO()}>+ Act</button>`}
+  const qb=new Set(openQs().map(q=>q.beat).filter(b=>b!=null));
+  const c=ui.view==="clue"&&S.clues.get(ui.clue);
+  [...el.querySelectorAll("[data-beat]")].forEach(btn=>{const n=+btn.dataset.beat;const b=beatDoc(n);
+    const st=STATUS.find(x=>x[0]===(b?beatStatus(b):"idea"));
+    btn.title=b?`${UN.one} ${n}: ${b.title} (${st[1].toLowerCase()}${beatWords(b)?`, ${beatWords(b).toLocaleString("en-GB")} words`:""}${scenesOf(n).length?`, ${scenesOf(n).length} scene${scenesOf(n).length===1?"":"s"}`:""})${canWrite&&db?" · drag to move":""}`:"";btn.setAttribute("aria-label",btn.title);
+    btn.dataset.st=st[0];
+    btn.classList.toggle("cur",n===ui.beat);btn.classList.toggle("past",ui.beat!=null&&n<ui.beat);
+    btn.classList.toggle("flagged",qb.has(n));
+    btn.classList.toggle("plant",!!c&&c.planted===n);btn.classList.toggle("pay",!!c&&c.payoff===n);
+    btn.classList.toggle("span",!!c&&c.planted!=null&&c.payoff!=null&&n>c.planted&&n<c.payoff);
+  });
+  const lensName=LENSES.find(l=>l[0]===ui.lens)[1];
+  let r;
+  if(!bs.length)r=`No ${UN.lm} yet`;
+  else if(ui.beat==null)r=`All ${CONFIG.beatCount} ${UN.lm} <span>· ${esc(lensName)} lens</span>`;
+  else{const b=beatDoc(ui.beat);r=`${UN.one} ${ui.beat}: ${esc(b?b.title:"")} <span>· ${esc(lensName)} lens${ui.lens==="truth"?"":", later knowledge faded"}</span>`}
+  $("readout").innerHTML=r;
+  renderProgress();renderTpl();
+}
+function renderProgress(){
+  const bs=beatsSorted(),el=$("prog");
+  if(!bs.length){el.hidden=true;return}
+  const done=bs.filter(b=>["drafted","revised"].includes(beatStatus(b))).length;
+  const words=bs.reduce((a,b)=>a+beatWords(b),0),tg=CONFIG.target||0;
+  const pct=tg?Math.min(100,words/tg*100):done/bs.length*100;
+  const f=n=>n.toLocaleString("en-GB");
+  el.hidden=false;
+  el.innerHTML=`<span>${done}/${bs.length} drafted</span>${words||tg?`<span>${f(words)}${tg?` / ${f(tg)}`:""} words</span>`:""}<span class="bar" title="${tg?"Words towards your goal":UN.many+" drafted or revised"}"><i style="width:${pct}%"></i></span>`;
+}
+function renderTpl(){
+  const el=$("tpl"),empty=!S.beats.size;
+  el.hidden=!empty;
+  if(empty&&el.dataset.on!=="1"){el.dataset.on="1";el.innerHTML=`<span>Start from a structure:</span>${TEMPLATES.map(t=>`<button class="btn" data-tpl="${t.id}" title="${esc(t.acts.map(a=>a[1]).join(" · "))} · ${t.beats.length} ${UN.lm}">${esc(t.name)}</button>`).join("")}<span>or press + on an act below to add your own ${UN.lm}.</span>`}
+  if(!empty)el.dataset.on="";
+}
+$("tpl").onclick=e=>{const b=e.target.closest("[data-tpl]");if(b)applyTemplate(b.dataset.tpl)};
+
+/* drag a beat to reorder it or move it to another act (mouse and pen, or press and hold on touch; the move buttons on the beat also work) */
+let drag=null,dragJustEnded=false,ghost=null,bar=null;
+function dragTarget(e){
+  const el=document.elementFromPoint(e.clientX,e.clientY);const grp=el&&el.closest("#beats .grp[data-k]");
+  document.querySelectorAll(".grp.dropto").forEach(x=>x.classList.remove("dropto"));
+  if(!grp){bar.style.display="none";return null}
+  const items=[...grp.querySelectorAll("[data-beat]")].filter(b=>+b.dataset.beat!==drag.n);
+  const idx=items.filter(b=>{const r=b.getBoundingClientRect();return e.clientX>r.left+r.width/2}).length;
+  if(!items.length){grp.classList.add("dropto");bar.style.display="none";return{k:grp.dataset.k,idx:0}}
+  const ref=items[Math.min(idx,items.length-1)].getBoundingClientRect();
+  bar.style.display="block";bar.style.left=(idx<items.length?ref.left-2:ref.right+1)+"px";bar.style.top=ref.top+"px";bar.style.height=ref.height+"px";
+  return{k:grp.dataset.k,idx};
+}
+$("beats").addEventListener("pointerdown",e=>{
+  if(e.button!==0||!(canWrite&&db))return;
+  const b=e.target.closest(".gb [data-beat]");if(!b)return;
+  drag={n:+b.dataset.beat,el:b,x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,on:false,target:null,touch:e.pointerType==="touch"};
+  if(drag.touch){const d=drag;d.timer=setTimeout(()=>{if(drag!==d||d.on)return;activateDrag();dragTarget2()},380)}
+});
+function activateDrag(){
+  drag.on=true;drag.el.classList.add("dragging");
+  try{navigator.vibrate&&navigator.vibrate(15)}catch(e){}
+  ghost=document.createElement("div");ghost.className="dragghost";ghost.textContent=`${drag.n} · ${(beatDoc(drag.n)||{}).title||""}`;document.body.appendChild(ghost);
+  bar=document.createElement("div");bar.className="dropbar";bar.style.display="none";document.body.appendChild(bar);
+}
+function dragTarget2(){const e={clientX:drag.lx,clientY:drag.ly};ghost.style.left=(e.clientX+12)+"px";ghost.style.top=(Math.max(0,e.clientY-48))+"px";drag.target=dragTarget(e)}
+window.addEventListener("pointermove",e=>{
+  if(!drag)return;
+  drag.lx=e.clientX;drag.ly=e.clientY;
+  if(!drag.on){
+    const dist=Math.hypot(e.clientX-drag.x,e.clientY-drag.y);
+    if(drag.touch){if(dist>8){clearTimeout(drag.timer);drag=null}return}
+    if(dist<6)return;
+    activateDrag();
+  }
+  if(drag.touch){dragTarget2();return}
+  ghost.style.left=(e.clientX+12)+"px";ghost.style.top=(e.clientY+12)+"px";
+  drag.target=dragTarget(e);
+});
+window.addEventListener("touchmove",e=>{if(drag&&drag.on&&e.cancelable)e.preventDefault()},{passive:false});
+window.addEventListener("pointercancel",()=>{if(!drag)return;clearTimeout(drag.timer);if(drag.on)endDrag(drag);drag=null});
+$("beats").addEventListener("contextmenu",e=>{if(e.target.closest("[data-beat]"))e.preventDefault()});
+function endDrag(d){
+  if(ghost)ghost.remove();if(bar)bar.remove();ghost=bar=null;
+  document.querySelectorAll(".grp.dropto").forEach(x=>x.classList.remove("dropto"));
+  if(d&&d.el)d.el.classList.remove("dragging");
+}
+window.addEventListener("pointerup",()=>{
+  if(!drag)return;clearTimeout(drag.timer);const d=drag;drag=null;
+  if(!d.on)return;
+  endDrag(d);dragJustEnded=true;setTimeout(()=>{dragJustEnded=false},60);
+  if(d.target)moveBeatTo(d.n,d.target.k,d.target.idx);
+});
+window.addEventListener("keydown",e=>{if(e.key==="Escape"&&drag&&drag.on){endDrag(drag);drag=null;dragJustEnded=true;setTimeout(()=>{dragJustEnded=false},60)}});
+$("beats").onclick=e=>{
+  if(dragJustEnded)return;
+  const bt=e.target.closest("[data-beat]");if(bt){openBeat(+bt.dataset.beat);return}
+  const ab=e.target.closest("[data-addbeat]");if(ab){addBeat(ab.dataset.addbeat);return}
+  if(e.target.closest("[data-addact]")){addAct();return}
+  const da=e.target.closest("[data-delact]");if(da)delAct(+da.dataset.delact)
+};
+$("beats").addEventListener("change",e=>{const t=e.target;if(t.dataset.actname==null)return;const i=+t.dataset.actname;saveSettings({acts:actsOut(CONFIG.acts.map((a,j)=>j===i?[a[0],t.value.trim()||"Untitled act"]:a))},"Renamed an act")});
+$("beats").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.dataset.actname!=null)e.target.blur()});
+$("unitedit").onclick=()=>{if(!(canWrite&&db))return;const i=$("unitin");i.hidden=false;i.value=UN.one;i.focus();i.select()};
+let unitCancel=false;
+$("unitin").addEventListener("blur",()=>{const i=$("unitin");if(i.hidden)return;i.hidden=true;const v=i.value.trim();if(!unitCancel&&v&&v!==UN.one)saveSettings({unit:v},`Renamed ${UN.lm} to ${plural(v).toLowerCase()}`);unitCancel=false});
+$("unitin").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur();if(e.key==="Escape"){e.stopPropagation();unitCancel=true;e.target.blur()}});
+$("allbtn").onclick=()=>{ui.beat=null;if(ui.view==="beat")ui.view="tab";renderAll()};
+$("search").addEventListener("input",e=>{ui.q=e.target.value.trim();paint()});
+$("search").addEventListener("keydown",e=>{if(e.key==="Enter"&&ui.q){const q=ui.q.toLowerCase();const m=[...S.nodes.values()].find(n=>shownDraft(n)&&n.name.toLowerCase().includes(q));if(m){ui.q="";e.target.value="";openNode(m.id)}}});
+document.addEventListener("keydown",e=>{
+  const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if(e.key==="Escape"&&!typing){ui.multi.clear();ui.focus=null;ui.view="tab";ui.confirm=null;renderAll()}
+  if(!typing&&ui.beat!=null&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){const n=ui.beat+(e.key==="ArrowRight"?1:-1);if(beatDoc(n))openBeat(n)}
+});
+
+/* ============ navigation ============ */
+function openNode(id){ui.view="node";ui.sel=id;ui.confirm=null;ui.deciding=null;openSheet();renderPanel(true);paint()}
+function openLink(id){ui.view="link";ui.link=id;ui.confirm=null;openSheet();renderPanel(true);paint()}
+function openBeat(n){ui.beat=n;ui.view="beat";ui.beatView=n;ui.confirm=null;ui.deciding=null;openSheet();renderPanel(true);paint()}
+function openClue(id){ui.view="clue";ui.clue=id;ui.confirm=null;openSheet();renderPanel(true);paint()}
+function openTab(t){ui.view="tab";ui.tab=t;ui.confirm=null;ui.deciding=null;renderPanel(true);paint()}
+function openSheet(){if(matchMedia("(max-width:860px)").matches){ui.sheet=true;$("panel").classList.add("open");$("sheetbar").setAttribute("aria-expanded","true");sheetHint()}}
+$("sheetbar").onclick=()=>{ui.sheet=!ui.sheet;$("panel").classList.toggle("open",ui.sheet);$("sheetbar").setAttribute("aria-expanded",ui.sheet);sheetHint()};
+function sheetHint(){const m=$("sheetbar").querySelector(".muted");if(m)m.textContent=ui.sheet?"tap to close":"tap to open"}
+
+/* ============ progress, templates, inline editing, timeline ============ */
+const STATUS=[["idea","Idea","#7f8899"],["outlined","Outlined","#5e9dac"],["drafted","Drafted","#c7a25e"],["revised","Revised","#7ee08a"]];
+const TEMPLATES=[
+ {id:"three",name:"Three-act",acts:[["1","Act 1 · Setup"],["2","Act 2 · Confrontation"],["3","Act 3 · Resolution"]],beats:[
+  ["1","Opening hook","Show the world and the main character before things change."],
+  ["1","Inciting incident","The event that disrupts the ordinary world."],
+  ["1","First plot point","The character commits to the problem. End of Act 1."],
+  ["2","Rising action","Obstacles grow. The character learns what they are up against."],
+  ["2","Midpoint","A reveal or reversal that raises the stakes."],
+  ["2","Complications","Things get harder and plans start to fail."],
+  ["2","Crisis","The lowest point. It looks like the goal is lost."],
+  ["3","Climax","The final confrontation."],
+  ["3","Resolution","The new normal. What has changed."]]},
+ {id:"cat",name:"Save the Cat",acts:[["1","Act 1"],["2","Act 2"],["3","Act 3"]],beats:[
+  ["1","Opening image"],["1","Theme stated"],["1","Set-up"],["1","Catalyst"],["1","Debate"],
+  ["2","Break into two"],["2","B story"],["2","Fun and games"],["2","Midpoint"],["2","Bad guys close in"],["2","All is lost"],["2","Dark night of the soul"],
+  ["3","Break into three"],["3","Finale"],["3","Final image"]]},
+ {id:"hero",name:"Hero's journey",acts:[["1","Departure"],["2","Initiation"],["3","Return"]],beats:[
+  ["1","Ordinary world"],["1","Call to adventure"],["1","Refusal of the call"],["1","Meeting the mentor"],["1","Crossing the threshold"],
+  ["2","Tests, allies and enemies"],["2","Approach to the inmost cave"],["2","Ordeal"],["2","Reward"],
+  ["3","The road back"],["3","Resurrection"],["3","Return with the elixir"]]},
+ {id:"seven",name:"Seven-point",acts:[["1","Beginning"],["2","Middle"],["3","End"]],beats:[
+  ["1","Hook"],["1","Plot turn 1"],["2","Pinch 1"],["2","Midpoint"],["2","Pinch 2"],["3","Plot turn 2"],["3","Resolution"]]}
+];
+async function applyTemplate(id){
+  const t=TEMPLATES.find(x=>x.id===id);if(!t||S.beats.size)return;
+  const items=[{coll:"settings",id:"story",after:settingsAfter({acts:actsOut(t.acts)})}];
+  t.beats.forEach(([a,title,text],i)=>{const n=i+1;items.push({coll:"beats",id:"b"+String(n).padStart(2,"0"),after:{n,act:a,title,text:text||"",ids:[],status:"idea",words:0}})});
+  await commit(`Started from a template: ${t.name}`,items,{synced:true});
+}
+const pad2=n=>"b"+String(n).padStart(2,"0");
+function beatGroups(){
+  const bs=beatsSorted();
+  const groups=CONFIG.acts.map(([k])=>({k,items:bs.filter(b=>b.act===k).map(b=>({oldN:b.n,act:k}))}));
+  const loose=bs.filter(b=>!CONFIG.acts.some(a=>a[0]===b.act));
+  if(loose.length)groups.push({k:null,items:loose.map(b=>({oldN:b.n,act:b.act}))});
+  return groups;
+}
+const flatGroups=g=>g.flatMap(x=>x.items.map(it=>({...it,act:x.k??it.act})));
+/* Rewrite every beat number, and everything that points at a beat number, to match a new order. */
+async function restructureBeats(finalList,summary){
+  const old=beatsSorted();
+  const map=new Map();finalList.forEach((e,i)=>{if(e.oldN!=null)map.set(e.oldN,i+1)});
+  const kept=[...map.keys()].sort((a,b)=>a-b);
+  const fallback=o=>{let best=0;for(const k of kept){if(k<o)best=map.get(k);else break}return best};
+  const mapRef=v=>{if(v==null||v===0)return v;return map.has(v)?map.get(v):fallback(v)};
+  const items=[];
+  finalList.forEach((e,i)=>{
+    const n=i+1,id=pad2(n),cur=S.beats.get(id);
+    if(e.oldN!=null){
+      if(e.oldN===n&&cur&&cur.act===e.act)return;
+      const base=strip(S.beats.get(pad2(e.oldN)));if(!base)return;
+      items.push({coll:"beats",id,after:{...base,n,act:e.act}});
+    }else items.push({coll:"beats",id,after:{n,act:e.act,title:`${UN.one} ${n}`,text:"",ids:[],status:"idea",words:0,...(e.newDoc||{})}});
+  });
+  for(let k=finalList.length+1;k<=old.length;k++)if(S.beats.get(pad2(k)))items.push({coll:"beats",id:pad2(k),after:null});
+  S.nodes.forEach(n=>{const nb=mapRef(n.beat);if(nb!==n.beat)items.push({coll:"nodes",id:n.id,after:{...strip(n),beat:nb}})});
+  S.links.forEach(l=>{
+    const steps=(l.steps||[]).map(x=>({...x,b:mapRef(x.b)})).sort((a,b)=>(a.b??0)-(b.b??0));
+    const m=mapRef(l.m),r=mapRef(l.r);
+    if(JSON.stringify(steps)!==JSON.stringify(l.steps||[])||m!==l.m||r!==l.r)items.push({coll:"links",id:l.id,after:{...strip(l),steps,m:m??null,r:r??null}});
+  });
+  S.questions.forEach(q=>{
+    if(q.beat==null)return;
+    if(!map.has(q.beat)&&fallback(q.beat)===0){items.push({coll:"questions",id:q.id,after:q.node?{...strip(q),beat:null}:null});return}
+    const nb=mapRef(q.beat);if(nb!==q.beat)items.push({coll:"questions",id:q.id,after:{...strip(q),beat:nb}});
+  });
+  S.scenes.forEach(sc=>{
+    let nb=mapRef(sc.beat);if(!map.has(sc.beat)&&nb===0)nb=finalList.length?1:0;
+    if(nb===0){items.push({coll:"scenes",id:sc.id,after:null});return}
+    if(nb!==sc.beat)items.push({coll:"scenes",id:sc.id,after:{...strip(sc),beat:nb}});
+  });
+  S.clues.forEach(c=>{
+    let pl=mapRef(c.planted),po=mapRef(c.payoff);if(pl===0)pl=null;if(po===0)po=null;
+    if(pl!==c.planted||po!==c.payoff)items.push({coll:"clues",id:c.id,after:{...strip(c),planted:pl??null,payoff:po??null}});
+  });
+  {const del=[],set=[],tgt=new Set();
+   S.arcpts.forEach(x=>{if(!map.has(x.beat)){del.push(x);return}const nb=map.get(x.beat);if(nb===x.beat)return;const nid=apId(x.node,nb);tgt.add(nid);del.push(x);set.push({coll:"arcpts",id:nid,after:{node:x.node,beat:nb,v:x.v}})});
+   del.filter(x=>!tgt.has(x.id)).forEach(x=>items.push({coll:"arcpts",id:x.id,after:null}));set.forEach(i=>items.push(i))}
+  if(!items.length)return true;
+  ui.busy=true;
+  const ok=await commit(summary,items,{synced:true});
+  ui.busy=false;
+  if(ok){
+    if(ui.beat!=null){const nb=mapRef(ui.beat);ui.beat=nb>0?nb:null}
+    if(ui.beatView!=null){const nb=mapRef(ui.beatView);if(map.has(ui.beatView))ui.beatView=nb;else{ui.beatView=null;if(ui.view==="beat")ui.view="tab"}}
+  }
+  schedule();
+  return ok;
+}
+async function addBeat(actKey){
+  const groups=beatGroups();
+  let g=groups.find(x=>x.k===(actKey??CONFIG.acts[0]?.[0]));
+  if(!g)g=groups.find(x=>x.k===null)||groups[groups.push({k:null,items:[]})-1];
+  const entry={oldN:null,act:g.k??""};g.items.push(entry);
+  const list=flatGroups(groups);const n=list.indexOf(list.find(e=>e.oldN==null))+1;
+  if(await restructureBeats(list,`Added ${UN.l1} ${n}`)){openBeat(n);ui.focusField="title";renderPanel(true)}
+}
+async function moveBeatTo(n,actKey,idx){
+  const groups=beatGroups();let item=null,from=null,fi=-1;
+  groups.forEach(g=>g.items.forEach((it,i)=>{if(it.oldN===n){item=it;from=g;fi=i}}));
+  const to=groups.find(g=>g.k===actKey);if(!item||!to)return;
+  from.items.splice(fi,1);
+  let at=Math.max(0,Math.min(idx,to.items.length));
+  to.items.splice(at,0,item);
+  const list=flatGroups(groups);
+  if(list.every((e,i)=>e.oldN===i+1&&(S.beats.get(pad2(i+1))||{}).act===e.act))return;
+  await restructureBeats(list,`Moved ${UN.l1} ${n}`);
+}
+async function moveBeatStep(n,dir){
+  const groups=beatGroups().filter(g=>g.k!==null||g.items.length);
+  let gi=-1,ii=-1;groups.forEach((g,a)=>g.items.forEach((it,i)=>{if(it.oldN===n){gi=a;ii=i}}));if(gi<0)return;
+  const g=groups[gi];
+  if(dir<0){
+    if(ii>0)return moveBeatTo(n,g.k,ii-1);
+    const prev=groups.slice(0,gi).reverse().find(x=>x.k!==null);if(prev)return moveBeatTo(n,prev.k,prev.items.length);
+  }else{
+    if(ii<g.items.length-1)return moveBeatTo(n,g.k,ii+1);
+    const next=groups.slice(gi+1).find(x=>x.k!==null);if(next)return moveBeatTo(n,next.k,0);
+  }
+}
+async function deleteBeat(id){
+  const b=S.beats.get(id);if(!b)return;
+  const groups=beatGroups();groups.forEach(g=>{g.items=g.items.filter(it=>it.oldN!==b.n)});
+  ui.confirm=null;
+  if(await restructureBeats(flatGroups(groups),`Deleted ${UN.l1} ${b.n}: ${b.title}`))toast(`Deleted ${UN.l1} ${b.n}. You can undo it from the Changes tab.`);
+}
+async function addAct(){const used=new Set(CONFIG.acts.map(a=>a[0]));let k=1;while(used.has(String(k)))k++;await saveSettings({acts:actsOut([...CONFIG.acts,[String(k),"New act"]])},"Added an act")}
+async function delAct(i){const a=CONFIG.acts[i];if(!a||beatsSorted().some(b=>b.act===a[0])){toast(`Move this act's ${UN.lm} out first.`);return}await saveSettings({acts:actsOut(CONFIG.acts.filter((_,j)=>j!==i))},`Removed act: ${a[1]}`)}
+function fitIn(el){el.size=Math.max(el.id==="storytitle"?4:10,(el.value||el.placeholder||"").length+1)}
+function bgRows(){return `<div class="rows" data-bgwrap>${(CONFIG.bgRaw||[]).map((r,i)=>`<div class="row"><input class="ed k" data-part="k" value="${esc(r.k)}" placeholder="Label" aria-label="Label" ${RO()}><textarea class="ed v" data-part="v" rows="1" placeholder="Detail" aria-label="Detail" ${RO()}>${esc(r.v)}</textarea><button class="x" data-act="delbg" data-i="${i}" title="Remove" ${RO()}>×</button></div>`).join("")}</div>`}
+function progressBox(){
+  const bs=beatsSorted();if(!bs.length)return"";
+  const words=bs.reduce((a,b)=>a+beatWords(b),0);
+  return `<div class="box"><h3>Progress</h3><div class="pills">${STATUS.map(([k,l,c])=>`<span class="pill" style="--c:${c}"><span class="sw"></span>${l} ${bs.filter(b=>beatStatus(b)===k).length}</span>`).join("")}</div>
+   <p class="small muted">${words.toLocaleString("en-GB")} words so far. Set a status and word count on each ${UN.l1} or scene; the bottom bar shows the status under every ${UN.l1} number.</p>
+   <label class="small muted">Word-count goal <input class="ed num" style="width:9em" type="number" min="0" data-setting="target" value="${CONFIG.target||""}" placeholder="e.g. 80000" ${RO()}></label></div>`;
+}
+function renderBoardMode(){
+  const tl=ui.board!=="web";
+  $("graph").style.visibility=tl?"hidden":"";
+  const hint=document.querySelector(".hint");if(hint)hint.style.display=tl?"none":"";
+  $("boardmsg").style.display=tl?"none":"";
+  $("timeline").hidden=!tl;
+  if(tl){if(ui.board==="arcs")renderArcs();else renderTimeline()}
+}
+function beatsByAct(){const all=beatsSorted();return CONFIG.acts.flatMap(a=>all.filter(b=>b.act===a[0])).concat(all.filter(b=>!CONFIG.acts.some(a=>a[0]===b.act)))}
+function renderTimeline(){
+  const el=$("timeline"),keepL=el.scrollLeft,keepT=el.scrollTop;
+  const bs=beatsByAct();
+  if(!bs.length){el.innerHTML=`<div class="empty">The timeline shows which nodes are in play in each ${UN.l1}. Start from a structure or add ${UN.lm} in the bar below to begin.</div>`;return}
+  const q=ui.q.toLowerCase();
+  const nodes=[...S.nodes.values()].filter(n=>shownDraft(n)&&!ui.offTypes.has(n.t)&&(!q||n.name.toLowerCase().includes(q)));
+  if(!nodes.length){el.innerHTML=`<div class="empty">No nodes to show yet. Press + Node to add a character, place or idea, then click cells here to put them into ${UN.lm}.</div>`;return}
+  const plays=new Map(bs.map(b=>[b.id,inPlay(b)]));
+  const first=n=>{const i=bs.findIndex(b=>plays.get(b.id).has(n.id));return i<0?1e9:i};
+  nodes.sort((a,b)=>first(a)-first(b)||a.name.localeCompare(b.name));
+  const placed=nodes.filter(n=>first(n)<1e9),loose=nodes.filter(n=>first(n)>=1e9);
+  const runs=[];bs.forEach(b=>{const l=ACTS[b.act]||"";const last=runs[runs.length-1];if(last&&last.l===l)last.n++;else runs.push({l,n:1})});
+  let h=`<div class="tl" style="grid-template-columns:minmax(110px,190px) repeat(${bs.length},minmax(24px,1fr))"><span></span>`+runs.map(r=>`<div class="ta" style="grid-column:span ${r.n}" title="${esc(r.l)}">${esc(r.l)}</div>`).join("");
+  h+=`<span></span>`+bs.map(b=>`<button class="th ${b.n===ui.beat?"cur":""}" data-tlbeat="${b.n}" title="${UN.one} ${b.n}: ${esc(b.title)}">${b.n}</button>`).join("");
+  const row=n=>`<button class="tn ${ui.view==="node"&&ui.sel===n.id?"sel":""}" style="--c:${col(n.t)}" data-tlnode="${n.id}" title="${esc(n.name)}"><span class="sw"></span>${esc(n.name)}</button>`+bs.map(b=>{const src=plays.get(b.id).get(n.id),on=!!src;return `<button class="tc ${on?"on":""} ${src==="scene"?"scn":""} ${b.n===ui.beat?"colcur":""}" style="--c:${col(n.t)}" data-tlcell="${n.id}|${b.id}" aria-pressed="${on}" aria-label="${esc(n.name)} in ${UN.l1} ${b.n}" title="${esc(n.name)} · ${UN.l1} ${b.n}: ${esc(b.title)}"></button>`}).join("");
+  h+=placed.map(row).join("");
+  if(loose.length)h+=`<div class="tdiv" style="grid-column:1/-1">Not in any ${UN.l1} yet. Click a cell to place them.</div>`+loose.map(row).join("");
+  el.innerHTML=h+`</div>`;el.scrollLeft=keepL;el.scrollTop=keepT;
+}
+$("timeline").onclick=e=>{
+  if(ui.board==="arcs"){arcClick(e);return}
+  const tb=e.target.closest("[data-tlbeat]");if(tb){openBeat(+tb.dataset.tlbeat);return}
+  const tn=e.target.closest("[data-tlnode]");if(tn){openNode(tn.dataset.tlnode);return}
+  const tc=e.target.closest("[data-tlcell]");if(!tc)return;
+  const [nid,bid]=tc.dataset.tlcell.split("|");const b=S.beats.get(bid);if(!b)return;
+  const ids=b.ids||[],on=ids.includes(nid);
+  if(!on&&inPlay(b).has(nid)){toast("Already in play through a scene. Edit the scene to change that.");return}
+  patch("beats",bid,{ids:on?ids.filter(x=>x!==nid):[...ids,nid]},`${UN.one} ${b.n}: ${on?"removed":"added"} ${nm(nid)}`);
+};
+/* header: rename the story in place, rename lens tabs, add a type */
+$("storytitle").addEventListener("input",e=>fitIn(e.target));
+$("storysub").addEventListener("input",e=>fitIn(e.target));
+$("storytitle").addEventListener("change",e=>saveSettings({title:e.target.value.trim()||"Untitled story"},"Renamed the story"));
+$("storysub").addEventListener("change",e=>saveSettings({subtitle:e.target.value.trim()},"Edited the subtitle"));
+[$("storytitle"),$("storysub")].forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur()}));
+$("lens").addEventListener("dblclick",e=>{
+  const b=e.target.closest("[data-lens]");if(!b||!["character","reader"].includes(b.dataset.lens)||!(canWrite&&db))return;
+  const k=b.dataset.lens;const inp=document.createElement("input");inp.className="lensin";inp.value=LENSES.find(l=>l[0]===k)[1];inp.maxLength=24;
+  b.replaceWith(inp);inp.focus();inp.select();let done=false;
+  const finish=ok=>{if(done)return;done=true;const v=inp.value.trim();if(ok&&v)saveSettings(k==="character"?{pov:v}:{reader:v},"Renamed a knowledge view");renderLens()};
+  inp.addEventListener("blur",()=>finish(true));
+  inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")inp.blur();if(ev.key==="Escape"){ev.stopPropagation();finish(false)}});
+});
+function openTypePop(btn){
+  const pop=$("pop");const used=new Set(Object.values(TYPES).map(v=>v.color));const sugg=TYPE_PALETTE.find(c=>!used.has(c))||TYPE_PALETTE[Object.keys(TYPES).length%TYPE_PALETTE.length];
+  pop.innerHTML=`<h3>New kind of node</h3><div class="pills"><input type="color" class="ed" id="pt-color" style="width:34px;padding:0;height:26px" value="${sugg}" aria-label="Colour"><input class="ed" id="pt-name" placeholder="Type name, e.g. Spaceship, Clan, Spell" aria-label="Type name"></div><input class="ed" id="pt-node" placeholder="Name of its first node (optional)" aria-label="First node name"><p class="small muted">Its filter chip appears once a node uses it.</p><div class="btns"><button class="btn neon" id="pt-go">Create type and node</button><button class="btn ghost" id="pt-cancel">Cancel</button></div>`;
+  pop.hidden=false;pop.style.left=Math.max(0,Math.min(btn.offsetLeft,document.querySelector("header").clientWidth-340))+"px";
+  $("pt-name").focus();
+  $("pt-cancel").onclick=()=>{pop.hidden=true};
+  $("pt-name").addEventListener("keydown",e=>{if(e.key==="Enter")$("pt-go").click()});
+  $("pt-go").onclick=async()=>{
+    const name=$("pt-name").value.trim();if(!name){toast("Give the type a name.");return}
+    const key=newId("t"),color=$("pt-color").value,nodeName=$("pt-node").value.trim();pop.hidden=true;
+    if(await saveSettings({types:[...typesOut(),{key,name,color}]},`Added node type: ${name}`))addNode(key,nodeName);
+  };
+}
+document.addEventListener("click",e=>{const pop=$("pop");if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest("[data-addtype]"))pop.hidden=true});
+
+/* ============ standalone mode: when the page is opened on its own (not inside Claude), keep the story in this browser ============ */
+function makeLocalDb(){
+  const KEY="story-webber-data-v1";let store={};
+  try{store=JSON.parse(localStorage.getItem(KEY)||"{}")||{}}catch(e){store={}}
+  const subs={};let warned=false;
+  const col=n=>store[n]||(store[n]={});
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){if(!warned){warned=true;toast("This browser can't save your story. Use Export in Setup to keep a copy.")}}};
+  const fire=n=>(subs[n]||[]).forEach(cb=>cb({docs:Object.entries(col(n)).map(([id,d])=>({id,data:()=>JSON.parse(JSON.stringify(d))}))}));
+  const ref=(n,id)=>({
+    async set(d){col(n)[id]=JSON.parse(JSON.stringify(d));save();fire(n)},
+    async update(f){col(n)[id]={...(col(n)[id]||{}),...JSON.parse(JSON.stringify(f))};save();fire(n)},
+    async delete(){delete col(n)[id];save();fire(n)}});
+  return{
+    collection(n){return{onSnapshot(cb){(subs[n]=subs[n]||[]).push(cb);setTimeout(()=>fire(n),0);return()=>{}},doc(id){return ref(n,id)}}},
+    doc(path){const [n,id]=path.split("/");return ref(n,id)},
+    __all(){return JSON.parse(JSON.stringify(store))},
+    __replace(data){store={};COLLS.forEach(n=>{if(data[n])store[n]=data[n]});save();COLLS.forEach(fire)}
+  };
+}
+function backupBox(){
+  if(!isLocal)return "";
+  return `<div class="box"><h3>Your copy of the story</h3><p class="small muted">This story is saved in this browser on this device only. To keep it safe, or move it to another device, download a backup file and load it back in later.</p>
+    <div class="btns"><button class="btn" data-act="bkexport">Download backup</button><button class="btn" data-act="bkimport">Load a backup…</button><input type="file" accept=".json,application/json" data-bkfile hidden></div></div>`;
+}
+function bkExport(){
+  const data=db.__all();delete data.changes;
+  const blob=new Blob([JSON.stringify({app:"story-webber",version:1,saved:new Date().toISOString(),data},null,1)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(CONFIG.title||"story").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()+"-backup.json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+async function bkImport(file){
+  try{
+    const j=JSON.parse(await file.text());
+    if(!j||j.app!=="story-webber"||!j.data)throw new Error("not a backup");
+    if(!confirm("Replace the story in this browser with the one in this file? This can't be undone."))return;
+    db.__replace(j.data);toast("Backup loaded.");
+  }catch(e){toast("That file isn't a Story Webber backup.")}
+}
+/* ============ character arcs ============ */
+const ARC_COLS=["#c9a14a","#7a8fd1","#d06a6a","#5fae8f","#b07cc6","#d98a4a","#4aa3b8","#9aa63f"];
+const arcOn=n=>!!(n&&n.arc&&typeof n.arc==="object");
+const arcPts=id=>[...S.arcpts.values()].filter(x=>x.node===id);
+const apId=(nid,b)=>`ap_${nid}_${b}`;
+const ARC_FIELDS=[["want","Want","What they are chasing on the surface"],["need","Need","What they actually need"],["flaw","Flaw","What holds them back"],["lie","Lie they believe","The false belief behind the flaw"]];
+function arcFields(n){return ARC_FIELDS.map(([k,l,ph])=>`<label class="small muted">${l}</label><textarea class="ed ph" rows="2" data-arc="${n.id}|${k}" placeholder="${ph}" aria-label="${l}" ${RO()}>${esc((n.arc||{})[k]||"")}</textarea>`).join("")}
+function saveArcField(t){const [id,f]=t.dataset.arc.split("|");const n=S.nodes.get(id);if(!n)return;patch("nodes",id,{arc:{...(n.arc||{}),[f]:t.value}},`${n.name}: edited arc`)}
+async function addArc(id){const n=S.nodes.get(id);if(!n||arcOn(n))return;ui.arcSel=id;await commit(`Started an arc for ${n.name}`,[{coll:"nodes",id,after:{...strip(n),arc:{want:"",need:"",flaw:"",lie:""}}}])}
+async function stopArc(id){const n=S.nodes.get(id);if(!n)return;ui.confirm=null;const items=[{coll:"nodes",id,after:{...strip(n),arc:null}}];arcPts(id).forEach(x=>items.push({coll:"arcpts",id:x.id,after:null}));await commit(`Stopped tracking ${n.name}'s arc`,items)}
+async function setArcPoint(nid,b,v){const n=S.nodes.get(nid);if(!n)return;const id=apId(nid,b),cur=S.arcpts.get(id);
+  if(cur&&cur.v===v)await commit(`${n.name}: cleared arc score, ${UN.l1} ${b}`,[{coll:"arcpts",id,after:null}]);
+  else await commit(`${n.name}: arc ${UN.l1} ${b} = ${v>0?"+":""}${v}`,[{coll:"arcpts",id,after:{node:nid,beat:b,v}}])}
+function openArc(id){ui.arcSel=id;ui.board="arcs";savePref();renderTools();paint()}
+function arcNotes(n,bs){
+  const pts=arcPts(n.id).sort((a,b)=>a.beat-b.beat),out=[];
+  if(!pts.length)return [`Click the grid to score where ${n.name} stands in each ${UN.l1}, from ${CONFIG.arcLow} up to ${CONFIG.arcHigh}.`];
+  const vs=pts.map(x=>x.v);
+  if(pts.length>=3&&Math.max(...vs)-Math.min(...vs)<=1)out.push(`Flat arc: ${n.name} barely moves across ${pts.length} scores. Fine for a steady character, but check it is deliberate.`);
+  if(pts.length>=2){const d=vs[vs.length-1]-vs[0];out.push(d>=3?`Ends clearly higher than they start (${d>0?"+":""}${d}): a positive arc.`:d<=-3?`Ends clearly lower than they start (${d}): a tragic or fall arc.`:`Ends close to where they start.`)}
+  const inb=bs.map(b=>inPlay(b).has(n.id)),appear=inb.filter(Boolean).length;
+  if(appear&&appear<bs.length){out.push(`In play in ${appear} of ${bs.length} ${UN.lm}.`);let run=0,best=0,end=0;inb.forEach((x,i)=>{run=x?0:run+1;if(run>best){best=run;end=i}});if(best>=3)out.push(`Off the page for ${best} ${UN.lm} in a row (${UN.one} ${bs[end-best+1].n} to ${bs[end].n}).`)}
+  const gaps=bs.filter(b=>inPlay(b).has(n.id)&&!S.arcpts.has(apId(n.id,b.n))).length;
+  if(gaps&&pts.length)out.push(`${gaps} ${UN.l1}${gaps===1?"":"s"} where they appear but have no score yet.`);
+  return out;
+}
+function renderArcs(){
+  const el=$("timeline"),keepL=el.scrollLeft,keepT=el.scrollTop;
+  const bs=beatsByAct();
+  if(!bs.length){el.innerHTML=`<div class="empty">Arcs show how a character changes from ${UN.l1} to ${UN.l1}. Start from a structure or add ${UN.lm} in the bar below first.</div>`;return}
+  const all=[...S.nodes.values()].filter(shownDraft).sort((a,b)=>a.name.localeCompare(b.name));
+  const tracked=all.filter(arcOn),untracked=all.filter(n=>!arcOn(n));
+  if(!tracked.some(n=>n.id===ui.arcSel))ui.arcSel=tracked[0]?.id||null;
+  const cc=id=>ARC_COLS[tracked.findIndex(n=>n.id===id)%ARC_COLS.length];
+  let h=`<div class="arcs"><div class="arcbar">${tracked.map(n=>`<button class="chip" data-arcsel="${n.id}" style="--c:${cc(n.id)}" aria-pressed="${n.id===ui.arcSel}"><span class="sw"></span>${esc(n.name)}</button>`).join("")}<select class="ed" data-arcadd aria-label="Track a character's arc" ${RO()}><option value="">+ Track a character…</option>${untracked.map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join("")}</select></div>`;
+  if(!tracked.length){el.innerHTML=h+`<div class="empty" style="position:static;padding:24px 4px">${all.length?`Pick a character above to start their arc. You score where they stand in each ${UN.l1}, and the lines show how they change.`:`Add a character with + Node first, then come back to track their arc.`}</div></div>`;return}
+  const sel=S.nodes.get(ui.arcSel),L=70,colW=38,T=24,rowH=22,B=44,W=L+bs.length*colW+10,H=T+11*rowH+B;
+  const x=i=>L+i*colW+colW/2,y=v=>T+(5-v)*rowH+rowH/2,idx=new Map(bs.map((b,i)=>[b.n,i]));
+  let g=`<svg class="arcsvg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Character arcs chart">`;
+  for(let v=5;v>=-5;v--)g+=`<line x1="${L}" x2="${W-10}" y1="${y(v)}" y2="${y(v)}" class="${v===0?"zero":"grid"}"/>`;
+  g+=`<text x="${L-8}" y="${y(5)+4}" text-anchor="end" class="ax">${esc(CONFIG.arcHigh)}</text><text x="${L-8}" y="${y(0)+4}" text-anchor="end" class="ax">0</text><text x="${L-8}" y="${y(-5)+4}" text-anchor="end" class="ax">${esc(CONFIG.arcLow)}</text>`;
+  let ai=0;bs.forEach((b,i)=>{const a=ACTS[b.act]||"";if(i===0||(ACTS[bs[i-1].act]||"")!==a){const sp=bs.filter(z=>(ACTS[z.act]||"")===a).length;g+=`<line x1="${L+i*colW}" x2="${L+i*colW}" y1="${T-6}" y2="${T+11*rowH}" class="div"/><text x="${L+i*colW+4}" y="${T-9}" class="act">${esc(a.length>Math.floor((sp*colW-6)/7)?a.slice(0,Math.max(1,Math.floor((sp*colW-6)/7)-1))+"…":a)}</text>`}});
+  bs.forEach((b,i)=>{g+=`<text x="${x(i)}" y="${T+11*rowH+16}" text-anchor="middle" class="ax ${b.n===ui.beat?"cur":""}">${b.n}</text>`;if(sel&&inPlay(b).has(sel.id))g+=`<circle cx="${x(i)}" cy="${T+11*rowH+30}" r="3" fill="${cc(sel.id)}"><title>${esc(sel.name)} is in play</title></circle>`});
+  const order=[...tracked.filter(n=>n.id!==ui.arcSel),sel];
+  order.forEach(n=>{const pts=arcPts(n.id).filter(q=>idx.has(q.beat)).sort((a,b)=>idx.get(a.beat)-idx.get(b.beat)),on=n.id===ui.arcSel,c=cc(n.id);
+    if(pts.length>1)g+=`<polyline fill="none" stroke="${c}" stroke-width="${on?3:1.8}" opacity="${on?1:.4}" stroke-linejoin="round" points="${pts.map(q=>x(idx.get(q.beat))+","+y(q.v)).join(" ")}"/>`;
+    pts.forEach(q=>{g+=`<circle cx="${x(idx.get(q.beat))}" cy="${y(q.v)}" r="${on?5:3}" fill="${c}" opacity="${on?1:.5}" pointer-events="none"/>`})});
+  bs.forEach((b,i)=>{for(let v=5;v>=-5;v--)g+=`<rect class="apc" x="${L+i*colW}" y="${T+(5-v)*rowH}" width="${colW}" height="${rowH}" data-ap="${b.n}|${v}"><title>${esc(sel.name)} · ${UN.one} ${b.n} · ${v>0?"+":""}${v}</title></rect>`});
+  g+=`</svg>`;
+  const notes=arcNotes(sel,bs);
+  h+=`<div class="arcchart">${g}</div><div class="box"><h3 style="--c:${cc(sel.id)}">${esc(sel.name)}<span class="sp"></span><button class="add" data-arcopen>Open character</button></h3><ul class="arcnote">${notes.map(t=>`<li>${esc(t)}</li>`).join("")}</ul><p class="small muted">Click a square to score ${esc(sel.name)} in that ${UN.l1}. Click the same square again to clear it. The dots under the numbers show where they are in play.</p></div><div class="box"><h3>Shape of the arc</h3>${arcFields(sel)}</div></div>`;
+  el.innerHTML=h;el.scrollLeft=keepL;el.scrollTop=keepT;
+}
+function arcClick(e){
+  const ch=e.target.closest("[data-arcsel]");if(ch){ui.arcSel=ch.dataset.arcsel;renderArcs();return}
+  const c=e.target.closest("[data-ap]");if(c){const [b,v]=c.dataset.ap.split("|").map(Number);setArcPoint(ui.arcSel,b,v);return}
+  if(e.target.closest("[data-arcopen]"))openNode(ui.arcSel);
+}
+$("timeline").addEventListener("change",e=>{const t=e.target;if(ui.board!=="arcs")return;if(t.dataset.arc)saveArcField(t);if(t.matches("[data-arcadd]")&&t.value)addArc(t.value)});
+
+/* ============ scenes ============ */
+const scenesOf=n=>[...S.scenes.values()].filter(x=>x.beat===n).sort((a,b)=>(a.order??0)-(b.order??0)||String(a.title).localeCompare(String(b.title)));
+const sIdx=st=>Math.max(0,STATUS.findIndex(x=>x[0]===(st||"idea")));
+function beatStatus(b){const sc=scenesOf(b.n);if(!sc.length)return b.status||"idea";return STATUS[Math.min(...sc.map(x=>sIdx(x.status)))][0]}
+function beatWords(b){const sc=scenesOf(b.n);return sc.length?sc.reduce((a,x)=>a+(+x.words||0),0):(+b.words||0)}
+function inPlay(b){const m=new Map();(b.ids||[]).forEach(id=>m.set(id,"manual"));scenesOf(b.n).forEach(x=>{[x.pov,x.loc,...(x.cast||[])].filter(Boolean).forEach(id=>{if(!m.has(id)&&S.nodes.has(id))m.set(id,"scene")})});return m}
+function openScene(id){ui.view="scene";ui.scene=id;ui.confirm=null;openSheet();renderPanel(true);paint()}
+async function addScene(n){
+  const id=newId("sc");
+  const doc={beat:n,order:scenesOf(n).length,title:"New scene",summary:"",pov:"",loc:"",cast:[],time:"",goal:"",conflict:"",outcome:"",status:"idea",words:0};
+  ui.view="scene";ui.scene=id;ui.focusField="title";openSheet();renderPanel(true);
+  await commit(`Added a scene to ${UN.l1} ${n}`,[{coll:"scenes",id,after:doc}]);
+}
+async function moveScene(id,dir){
+  const sc=S.scenes.get(id);if(!sc)return;
+  const list=scenesOf(sc.beat);const i=list.findIndex(x=>x.id===id),j=i+dir;if(j<0||j>=list.length)return;
+  [list[i],list[j]]=[list[j],list[i]];
+  const items=[];list.forEach((x,k)=>{if(x.order!==k)items.push({coll:"scenes",id:x.id,after:{...strip(x),order:k}})});
+  await commit("Reordered scenes",items,{synced:true});
+}
+async function deleteScene(id){
+  const sc=S.scenes.get(id);if(!sc)return;ui.confirm=null;
+  ui.view="beat";ui.beatView=sc.beat;
+  await commit(`Deleted scene: ${sc.title}`,[{coll:"scenes",id,after:null}]);
+}
+function sceneView(){
+  const sc=S.scenes.get(ui.scene);
+  if(!sc)return `<button class="back" data-act="back">← Back</button><p class="muted">Saving…</p>`;
+  const id=sc.id,list=scenesOf(sc.beat),pos=list.findIndex(x=>x.id===id);
+  const b=beatDoc(sc.beat);
+  const nodes=[...S.nodes.values()].filter(shownDraft).sort((a,c)=>a.name.localeCompare(c.name));
+  const pick=(field,val,label)=>`<select class="ed" data-save="scenes|${id}|${field}" aria-label="${label}" ${RO()}><option value="">— none —</option>${nodes.map(n=>`<option value="${n.id}" ${n.id===val?"selected":""}>${esc(n.name)}</option>`).join("")}</select>`;
+  const cast=(sc.cast||[]).filter(x=>S.nodes.has(x));
+  let h=`<button class="back" data-act="beat" data-n="${sc.beat}">← ${esc(UN.one)} ${sc.beat}${b?`: ${esc(b.title)}`:""}</button>`;
+  h+=`<div class="eyebrow">Scene ${pos+1} of ${list.length}</div>`;
+  h+=`<input class="ed title" data-save="scenes|${id}|title" data-ff="title" value="${esc(sc.title)}" aria-label="Scene title" ${RO()}>`;
+  h+=`<div class="pills"><select class="ed" data-save="scenes|${id}|status" aria-label="Status" ${RO()}>${STATUS.map(([k,l])=>`<option value="${k}" ${(sc.status||"idea")===k?"selected":""}>${l}</option>`).join("")}</select><label class="small muted">words <input class="ed num" style="width:6em" type="number" min="0" data-words="scenes|${id}" value="${sc.words||0}" ${RO()}></label><label class="small muted">in <select class="ed" data-bsel="scenes|${id}" aria-label="${esc(UN.one)}" ${RO()}>${beatsSorted().map(x=>`<option value="${x.n}" ${x.n===sc.beat?"selected":""}>${esc(UN.one)} ${x.n}: ${esc(x.title)}</option>`).join("")}</select></label></div>`;
+  h+=`<dl class="kv"><dt>Point of view</dt><dd>${pick("pov",sc.pov,"Point of view character")}</dd><dt>Where</dt><dd>${pick("loc",sc.loc,"Location")}</dd><dt>When</dt><dd><input class="ed" data-save="scenes|${id}|time" value="${esc(sc.time)}" placeholder="Time of day, date…" aria-label="When" ${RO()}></dd></dl>`;
+  h+=`<div><h3>Also in the scene</h3><div class="pills">${cast.map(nid=>{const n=S.nodes.get(nid);return `<span class="pill" style="--c:${col(n.t)}"><span class="sw"></span>${esc(n.name)}<button class="x" data-act="scenecastrm" data-id="${nid}" ${RO()}>×</button></span>`}).join("")}</div>
+    <select class="ed" data-act-change="scenecastadd" aria-label="Add to the scene" ${RO()} style="margin-top:6px"><option value="">+ Add someone or something…</option>${nodes.filter(n=>!cast.includes(n.id)&&n.id!==sc.pov&&n.id!==sc.loc).map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join("")}</select></div>`;
+  h+=`<textarea class="ed ph" rows="3" data-save="scenes|${id}|summary" placeholder="What happens in this scene?" aria-label="Summary" ${RO()}>${esc(sc.summary)}</textarea>`;
+  const gco=sc.goal||sc.conflict||sc.outcome;
+  h+=`<details class="sec" data-sec="gco" ${(ui.sec.gco??!!gco)?"open":""}><summary>Goal, conflict, outcome</summary><div class="secb"><textarea class="ed ph" rows="2" data-save="scenes|${id}|goal" placeholder="What does the point-of-view character want here?" aria-label="Goal" ${RO()}>${esc(sc.goal)}</textarea><textarea class="ed ph" rows="2" data-save="scenes|${id}|conflict" placeholder="What stands in the way?" aria-label="Conflict" ${RO()}>${esc(sc.conflict)}</textarea><textarea class="ed ph" rows="2" data-save="scenes|${id}|outcome" placeholder="How does it end? What changes?" aria-label="Outcome" ${RO()}>${esc(sc.outcome)}</textarea></div></details>`;
+  h+=`<div class="btns"><button class="btn" data-act="scenemove" data-id="${id}" data-dir="-1" ${pos>0&&canWrite&&db?"":"disabled"}>↑ Earlier</button><button class="btn" data-act="scenemove" data-id="${id}" data-dir="1" ${pos<list.length-1&&canWrite&&db?"":"disabled"}>↓ Later</button>${confirmUI("delscene-"+id,"Delete this scene?",`delsceneyes" data-id="${id}`)||`<button class="btn danger" data-act="ask" data-key="delscene-${id}" ${RO()}>Delete scene</button>`}</div>`;
+  return h;
+}
+
+/* ============ story settings ============ */
+function applySettings(){
+  const st=S.settings.get("story")||{};
+  CONFIG.title=st.title??BASE.title;
+  CONFIG.subtitle=st.subtitle??BASE.subtitle;
+  CONFIG.intro.eyebrow=st.eyebrow??BASE.eyebrow;
+  CONFIG.intro.heading=st.heading??BASE.heading;
+  setUnit(st.unit);
+  CONFIG.pov=(st.pov||"").trim()||BASE.pov;
+  CONFIG.reader=(st.reader||"").trim()||BASE.reader;
+  CONFIG.arcLow=(st.arcLow||"").trim()||"Low";CONFIG.arcHigh=(st.arcHigh||"").trim()||"High";
+  LENSES=buildLenses(CONFIG.pov,CONFIG.reader);
+  CONFIG.bgRaw=Array.isArray(st.background)?st.background:BASE.background.map(([k,v])=>({k,v}));
+  CONFIG.background=CONFIG.bgRaw.filter(o=>o.k||o.v).map(o=>[o.k,o.v]);
+  CONFIG.acts=Array.isArray(st.acts)?st.acts.map(a=>Array.isArray(a)?a:[a.k,a.l]):BASE.acts;
+  TYPES=normTypes(Array.isArray(st.types)&&st.types.length?st.types:BASE.types);
+  ACTS=Object.fromEntries(CONFIG.acts);
+  CONFIG.beatCount=Math.max(1,S.beats.size);
+  CONFIG.target=Math.max(0,Math.round(+st.target)||0);
+  document.title=CONFIG.title;
+  $("allbtn").textContent=`Show all ${UN.lm}`;
+  const ti=$("storytitle"),sb=$("storysub");
+  if(document.activeElement!==ti){ti.value=CONFIG.title;fitIn(ti)}
+  if(document.activeElement!==sb){sb.value=CONFIG.subtitle||"";fitIn(sb)}
+}
+const actsOut=a=>a.map(([k,l])=>({k,l}));
+const typesOut=()=>Object.entries(TYPES).map(([key,v])=>({key,name:v.one,color:v.color}));
+function settingsAfter(fields){return {...(strip(S.settings.get("story"))||{}),...fields}}
+function saveSettings(fields,summary,opts={}){return commit(summary,[{coll:"settings",id:"story",after:settingsAfter(fields)}],{synced:true,...opts})}
+function setupTab(){
+  const bs=beatsSorted(),acts=CONFIG.acts;
+  return `<div class="eyebrow">Setup</div><h2>Your story</h2>
+  <p class="small muted">All of this can also be changed straight on the page: click the title to rename it, double-click the viewpoint or reader tab, use + Type above the web, and use + on each act in the bottom bar. This tab is just the full list in one place.</p>
+  <div class="box"><h3>Story</h3>
+    <label class="small muted">Name</label><input class="ed title" data-setting="title" value="${esc(CONFIG.title)}" aria-label="Story name" ${RO()}>
+    <label class="small muted">Subtitle (optional)</label><input class="ed" data-setting="subtitle" value="${esc(CONFIG.subtitle)}" placeholder="e.g. a place and date" ${RO()}>
+    <label class="small muted">Top of the Story tab</label><input class="ed" data-setting="eyebrow" value="${esc(CONFIG.intro.eyebrow)}" placeholder="Small line (optional)" ${RO()}>
+    <input class="ed" data-setting="heading" value="${esc(CONFIG.intro.heading)}" aria-label="Heading" ${RO()}>
+    <label class="small muted">Viewpoint character, for the "who knows what" view</label><input class="ed" data-setting="pov" value="${esc(CONFIG.pov===BASE.pov?"":CONFIG.pov)}" placeholder="${esc(BASE.pov)}" ${RO()}>
+    <label class="small muted">What do you call each section of your story? (Beat, Chapter, Episode…)</label><input class="ed" list="unitlist" data-setting="unit" value="${esc(UN.one==="Beat"?"":UN.one)}" placeholder="Beat" ${RO()}><datalist id="unitlist"><option>Beat</option><option>Chapter</option><option>Episode</option><option>Section</option><option>Part</option></datalist>
+    <label class="small muted">Character arc scale: what the bottom and top of the chart mean (for example Despair and Hope)</label><div class="pills"><input class="ed" style="width:10em" data-setting="arcLow" value="${esc(CONFIG.arcLow==="Low"?"":CONFIG.arcLow)}" placeholder="Low" aria-label="Bottom of the arc scale" ${RO()}><input class="ed" style="width:10em" data-setting="arcHigh" value="${esc(CONFIG.arcHigh==="High"?"":CONFIG.arcHigh)}" placeholder="High" aria-label="Top of the arc scale" ${RO()}></div>
+    <label class="small muted">Name for the "what the reader knows" view</label><input class="ed" data-setting="reader" value="${esc(CONFIG.reader===BASE.reader?"":CONFIG.reader)}" placeholder="${esc(BASE.reader)}" ${RO()}>
+  </div>
+  <div class="box"><h3>Story notes<span class="sp"></span><button class="add" data-act="addbg" ${RO()}>+ Add line</button></h3>
+    <p class="small muted">Optional facts shown at the bottom of the Story tab, such as Setting, Era or Rules of the world.</p>
+    ${bgRows()}
+  </div>
+  <div class="box"><h3>Node types<span class="sp"></span><button class="add" data-act="addtype" ${RO()}>+ Add type</button></h3>
+    <p class="small muted">Each type has its own colour on the web. A filter appears at the top once a node uses that type.</p>
+    ${Object.entries(TYPES).map(([k,v],i)=>`<div class="pills"><input type="color" class="ed" style="width:34px;padding:0;height:26px" data-typecolor="${i}" value="${esc(v.color)}" aria-label="Colour" ${RO()}><input class="ed" data-typename="${i}" value="${esc(v.one)}" aria-label="Type name" ${RO()}><span class="tag">${[...S.nodes.values()].filter(n=>n.t===k).length} nodes</span><button class="x" data-act="deltype" data-i="${i}" title="Remove type" ${RO()}>×</button></div>`).join("")}
+  </div>
+  <div class="box"><h3>Acts<span class="sp"></span><button class="add" data-act="addact" ${RO()}>+ Add act</button></h3>
+    ${acts.length?acts.map(([k,l],i)=>`<div class="pills"><input class="ed" data-acts="${i}" value="${esc(l)}" aria-label="Act name" ${RO()}><span class="tag">${bs.filter(b=>b.act===k).length} ${UN.lm}</span><button class="x" data-act="delact" data-i="${i}" title="Remove act" ${RO()}>×</button></div>`).join(""):`<p class="small muted">No acts yet.</p>`}
+  </div>
+  <div class="box"><h3>${UN.many} (${bs.length})<span class="sp"></span><button class="add" data-act="addbeat" ${RO()}>+ Add ${UN.l1}</button></h3>
+    ${bs.map(b=>`<div class="pills"><span class="tag">${b.n}</span><input class="ed" data-save="beats|${b.id}|title" value="${esc(b.title)}" aria-label="${UN.one} title" ${RO()}><select class="ed" data-save="beats|${b.id}|act" aria-label="Act" ${RO()}>${acts.map(([k,l])=>`<option value="${esc(k)}" ${k===b.act?"selected":""}>${esc(l)}</option>`).join("")}</select>${confirmUI("delbeat-"+b.id,"Delete?",`delbeatyes" data-id="${b.id}`)||`<button class="x" data-act="ask" data-key="delbeat-${b.id}" title="Delete this ${UN.l1}" ${RO()}>×</button>`}</div>`).join("")||`<p class="small muted">No ${UN.lm} yet.</p>`}
+    ${bs.length?`<p class="small muted">Drag ${UN.lm} in the bottom bar to reorder them or move them to another act. Numbers update to match.</p>`:""}
+  </div>${backupBox()}`;
+}
+/* ============ creating things ============ */
+function viewCenter(){const t=d3.zoomTransform(svg.node());return t.invert([W()/2,H()/2])}
+async function addNode(typeKey,name){
+  const id=newId("n");const [x,y]=viewCenter().map(v=>v+(Math.random()-.5)*140);
+  const draft=ui.draftInto&&scen(ui.draftInto)?ui.draftInto:null;
+  const doc={name:name||"New node",t:typeKey||firstType(),beat:ui.beat??0,sum:"",note:"",notes:"",f:[],knows:[],minor:false,pinned:true,x:Math.round(x),y:Math.round(y),draft};
+  ui.view="node";ui.sel=id;ui.focusField="name";openSheet();renderPanel(true);
+  await commit(`Added node: ${doc.name}${draft?" (draft)":""}`,[{coll:"nodes",id,after:doc}]);
+}
+async function createLink(s,t){
+  const b=ui.beat??Math.max(S.nodes.get(s)?.beat||0,S.nodes.get(t)?.beat||0);
+  const draft=ui.draftInto&&scen(ui.draftInto)?ui.draftInto:null;
+  const id=newId("l");
+  ui.view="link";ui.link=id;ui.focusField="step0";openSheet();renderPanel(true);
+  await commit(`Connected ${nm(s)} → ${nm(t)}${draft?" (draft)":""}`,[{coll:"links",id,after:{s,t,steps:[{b,text:"new connection"}],k:"",m:b,r:b,draft}}]);
+}
+
+/* ============ panel ============ */
+const P=$("pbody");let panelPending=false;
+function renderPanel(force){
+  const a=document.activeElement;
+  if(!force&&a&&P.contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){panelPending=true;return}
+  panelPending=false;
+  renderTabs();
+  const v=ui.view;let h="";
+  if(ui.view!=="node")ui.newType=false;
+  if(!loaded.size&&!dbFailed)h=`<p class="muted">Loading the story web…</p>`;
+  else if(dbFailed)h=`<div class="empty">This view can't reach the story data. Open the web from Claude to view and edit it.</div>`;
+  else if(v==="node")h=nodeView();
+  else if(v==="link")h=linkView();
+  else if(v==="beat")h=beatView();
+  else if(v==="scene")h=sceneView();
+  else if(v==="clue")h=clueView();
+  else h=({story:storyTab,questions:questionsTab,clues:cluesTab,whatifs:whatifsTab,changes:changesTab,setup:setupTab,help:helpTab}[ui.tab]||storyTab)();
+  const keep=P.scrollTop;const sameView=P.dataset.view===v+(ui.sel||"")+(ui.link||"")+(ui.tab||"")+(ui.clue||"")+(ui.beatView||"")+(ui.scene||"");
+  P.innerHTML=h;P.dataset.view=v+(ui.sel||"")+(ui.link||"")+(ui.tab||"")+(ui.clue||"")+(ui.beatView||"")+(ui.scene||"");
+  P.scrollTop=sameView?keep:0;
+  P.querySelectorAll("textarea.ed").forEach(autosize);
+  if(ui.focusField){const f=P.querySelector(`[data-ff="${ui.focusField}"]`);if(f){f.focus();f.select&&f.select();ui.focusField=null}}
+  $("sheettitle").textContent=sheetTitle();
+}
+function sheetTitle(){if(ui.view==="node")return nm(ui.sel);if(ui.view==="beat")return UN.one+" "+ui.beatView;if(ui.view==="scene")return (S.scenes.get(ui.scene)||{}).title||"Scene";if(ui.view==="link")return "Connection";if(ui.view==="clue")return S.clues.get(ui.clue)?.name||"Clue";return {story:"Story web",questions:"Open questions",clues:"Clue ledger",whatifs:"What-ifs",changes:"Changes",setup:"Setup",help:"Help"}[ui.tab]}
+P.addEventListener("focusout",e=>{if(panelPending&&!(e.relatedTarget&&P.contains(e.relatedTarget)&&/INPUT|TEXTAREA|SELECT/.test(e.relatedTarget.tagName)))setTimeout(()=>renderPanel(),0)});
+function autosize(t){t.style.height="auto";t.style.height=t.scrollHeight+2+"px"}
+P.addEventListener("mouseover",e=>{const t=e.target.closest('[data-act="link"]');const id=t?t.dataset.id:null;if(id!==ui.hoverLink){ui.hoverLink=id;paint()}});
+P.addEventListener("mouseleave",()=>{if(ui.hoverLink){ui.hoverLink=null;paint()}});
+P.addEventListener("input",e=>{if(e.target.tagName==="TEXTAREA")autosize(e.target)});
+P.addEventListener("toggle",e=>{const d=e.target;if(d.dataset&&d.dataset.sec)ui.sec[d.dataset.sec]=d.open},true);
+function renderTabs(){
+  const oq=openQs().length,flags=[...S.clues.values()].filter(c=>clueFlags(c).length).length,sc=S.scenarios.size;
+  const T=[["story","Story",""],["questions","Questions",oq?`<span class="n red">${oq}</span>`:""],["clues","Clues",flags?`<span class="n red">${flags}</span>`:`<span class="n">${S.clues.size}</span>`],["whatifs","What-ifs",sc?`<span class="n">${sc}</span>`:""],["changes","Changes",""],["setup","Setup",""],["help","?",""]];
+  $("tabs").innerHTML=T.map(([k,l,n])=>`<button role="tab" data-tab="${k}" ${k==="help"?'title="How this works"':""} aria-selected="${ui.view==="tab"&&ui.tab===k}">${l}${n}</button>`).join("");
+}
+$("tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)openTab(b.dataset.tab)};
+const backBtn=()=>`<button class="back" data-act="back">← ${({story:"Story",questions:"Questions",clues:"Clues",whatifs:"What-ifs",changes:"Changes",setup:"Setup",help:"Help"})[ui.tab]}</button>`;
+const nodeItem=(id,right="",rel="")=>{const n=S.nodes.get(id);if(!n)return"";return `<div class="item"><button class="nm" data-act="node" data-id="${id}" style="--c:${col(n.t)}"><span class="sw"></span>${esc(n.name)}${n.draft?` <span class="tag neon" style="--sc:${scColor(n.draft)}">draft</span>`:""}</button><span class="b">${right}</span>${rel?`<span class="rel">${rel}</span>`:""}</div>`};
+const confirmUI=(key,label,yes)=>ui.confirm===key?`<span class="confirm">${label} <button class="btn danger" data-act="${yes}">Yes</button><button class="btn ghost" data-act="cancel">Cancel</button></span>`:null;
+const draftBox=(x,coll,id)=>{if(!x.draft)return"";const s=scen(x.draft);const c=scColor(x.draft);
+  return `<div class="box neonbox" style="--sc:${c}"><h3 style="color:${c}">Draft · ${esc(s?s.name:"unknown what-if")}</h3><p class="small muted">Only shows while this what-if is switched on. Not part of your main story yet.</p><div class="btns">${confirmUI("bin-"+id,"Bin this draft?",`binitem" data-coll="${coll}" data-id="${id}`)||`<button class="btn neon" style="--sc:${c}" data-act="canonitem" data-coll="${coll}" data-id="${id}" ${RO()}>Make canon</button><button class="btn ghost" data-act="ask" data-key="bin-${id}" ${RO()}>Bin</button>`}</div></div>`};
+function qBlock(q){
+  const label=q.beat!=null?`${UN.one} ${q.beat}`:"";
+  if(ui.deciding===q.id)return `<div class="q"><div class="qh"><span>${label?`<b>${label}</b>`:""}${esc(q.text)}</span></div><textarea class="ed ph" data-ff="decision" id="dec-${q.id}" placeholder="What did you decide?" style="margin:0;border-color:var(--line-2)"></textarea><div class="btns"><button class="btn" data-act="savedecision" data-id="${q.id}">Save decision</button><button class="btn ghost" data-act="canceldecide">Cancel</button></div></div>`;
+  return `<div class="q"><div class="qh"><span>${label?`<b>${label}</b>`:""}<textarea class="ed" rows="1" data-save="questions|${q.id}|text" aria-label="Question" ${RO()}>${esc(q.text)}</textarea></span><button class="btn" data-act="decide" data-id="${q.id}" ${RO()}>Decide</button></div></div>`;
+}
+const decidedBlock=q=>`<div class="item"><span>${esc(q.text)}</span><button class="x" title="Reopen" data-act="reopen" data-id="${q.id}" ${RO()}>↺</button><span class="rel"><span class="tag ok">decided</span> ${esc(q.decision)}${q.decidedAt?` · ${fmtDate(q.decidedAt)}`:""}</span></div>`;
+function listRows(coll,id,field,rows,kph,vph){
+  return `<div class="rows" data-listwrap="${coll}|${id}|${field}">${(rows||[]).map((r,i)=>`<div class="row"><input class="ed k" data-part="k" value="${esc(r.k)}" placeholder="${kph}" aria-label="Label" ${RO()}><textarea class="ed v" data-part="v" rows="1" placeholder="${vph}" aria-label="Detail" ${RO()}>${esc(r.v)}</textarea><button class="x" data-act="delrow" data-i="${i}" title="Remove" ${RO()}>×</button></div>`).join("")}<button class="add" data-act="addrow" ${RO()}>+ Add line</button></div>`;
+}
+
+function nodeView(){
+  const n=S.nodes.get(ui.sel);
+  if(!n)return backBtn()+`<p class="muted">Saving…</p>`;
+  const id=n.id;
+  const ls=[...S.links.values()].filter(l=>(l.s===id||l.t===id)).sort((a,b)=>(a.steps?.[0]?.b??0)-(b.steps?.[0]?.b??0));
+  const beatsIn=beatsSorted().filter(b=>inPlay(b).has(id)).map(b=>b.n);
+  const scenesIn=[...S.scenes.values()].filter(x=>x.pov===id||x.loc===id||(x.cast||[]).includes(id)).sort((a,c)=>(a.beat-c.beat)||((a.order??0)-(c.order??0)));
+  const qs=[...S.questions.values()].filter(q=>q.node===id);
+  const oq=qs.filter(q=>q.status!=="decided"),dq=qs.filter(q=>q.status==="decided");
+  const clues=[...S.clues.values()].filter(c=>(c.nodes||[]).includes(id));
+  const pinned=n.pinned||simMap.get(id)?.localPin;
+  let h=backBtn();
+  h+=`<div class="eyebrow" style="--c:${col(n.t)}"><span class="sw"></span>
+    <select class="ed" data-save="nodes|${id}|t" aria-label="Type" ${RO()}>${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===n.t?"selected":""}>${esc(v.one)}</option>`).join("")}<option value="__new">+ New type…</option></select><input type="color" class="ed" style="width:26px;padding:0;height:22px;margin:0" data-typecolorkey="${esc(n.t)}" value="${esc((TYPES[n.t]||{color:"#9aa5b1"}).color)}" title="Change this type's colour" aria-label="Type colour" ${RO()}>
+    <label>first seen ${UN.l1} <input class="ed num" type="number" min="0" max="${CONFIG.beatCount}" data-num="nodes|${id}|beat" value="${n.beat??0}" ${RO()}></label>
+    <label title="Shown smaller on the map"><input type="checkbox" data-bool="nodes|${id}|minor" ${n.minor?"checked":""} ${RO()}> minor</label></div>`;
+  if(ui.newType){const used=new Set(Object.values(TYPES).map(v=>v.color));const sugg=TYPE_PALETTE.find(c=>!used.has(c))||TYPE_PALETTE[Object.keys(TYPES).length%TYPE_PALETTE.length];
+    h+=`<div class="box"><h3>New type</h3><div class="pills"><input type="color" class="ed" id="nt-color" style="width:34px;padding:0;height:26px" value="${sugg}" aria-label="Colour"><input class="ed" id="nt-name" data-ff="ntname" placeholder="e.g. Spaceship, Clan, Spell" aria-label="Type name"></div><div class="btns"><button class="btn neon" data-act="savetype" ${RO()}>Add and use</button><button class="btn ghost" data-act="canceltype">Cancel</button></div></div>`;
+    ui.focusField=ui.focusField||"ntname"}
+  h+=`<input class="ed title" data-save="nodes|${id}|name" data-ff="name" value="${esc(n.name)}" aria-label="Name" ${RO()}>`;
+  h+=draftBox(n,"nodes",id);
+  h+=`<textarea class="ed ph" rows="2" data-save="nodes|${id}|sum" placeholder="Summary" aria-label="Summary" ${RO()}>${esc(n.sum)}</textarea>`;
+  const sec=(k,title,body,def,count)=>{const open=ui.sec[k]??def;return `<details class="sec" data-sec="${k}" ${open?"open":""}><summary>${title}${count!=null?`<span class="n">${count}</span>`:""}</summary><div class="secb">${body}</div></details>`};
+  const others=[...S.nodes.values()].filter(o=>o.id!==id&&shownDraft(o)).sort((a,b)=>a.name.localeCompare(b.name));
+  const conns=ls.map(l=>{const o=l.s===id?l.t:l.s;const on=S.nodes.get(o);if(!on)return"";
+    const steps=(l.steps||[]).map(s=>`${s.b?UN.one[0]+s.b:"world"}: ${esc(s.text)}`).join(" · ");
+    const tags=(l.k==="herring"?` <span class="tag hr">red herring</span>`:"")+(l.draft?` <span class="tag neon" style="--sc:${scColor(l.draft)}">draft</span>`:"");
+    return `<div class="item"><button class="nm" data-act="link" data-id="${l.id}" style="--c:${col(on.t)}"><span class="sw"></span>${l.s===id?"→":"←"} ${esc(on.name)}</button><span class="b">${l.steps?.[0]?.b?UN.one[0]+l.steps[0].b:"world"}</span><span class="rel">${steps}${tags}</span></div>`}).join("");
+  h+=sec("conn","Connections",`<div class="list">${conns||`<p class="small muted">Nothing connected yet.</p>`}</div><select class="ed" data-act-change="connectto" aria-label="Connect to another node" ${RO()}><option value="">+ Connect to…</option>${others.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select>`,true,ls.length);
+  h+=sec("q","Open questions",`<div class="box red" style="border:0;background:none;padding:0">${oq.length?oq.map(qBlock).join(""):`<p class="small muted">None open.</p>`}${dq.length?`<div class="list">${dq.map(decidedBlock).join("")}</div>`:""}</div><button class="add" data-act="addq" data-node="${id}" ${RO()}>+ Add a question</button>`,oq.length>0,oq.length||null);
+  const hasDetail=(n.f||[]).length||(n.knows||[]).length;
+  h+=sec("detail","Profile & over time",`<div><h3>Profile</h3>${listRows("nodes",id,"f",n.f,"Label","Detail")}</div><div><h3>Over time</h3>${listRows("nodes",id,"knows",n.knows,"When","What changes or what they know")}</div>`,!!hasDetail);
+  h+=sec("notes","Notes",`<div><h3>Rules & warnings</h3><textarea class="ed ph" rows="1" data-save="nodes|${id}|note" placeholder="Things to keep consistent" aria-label="Rules and warnings" ${RO()}>${esc(n.note)}</textarea></div><div><h3>Scratch notes</h3><textarea class="ed ph" rows="2" data-save="nodes|${id}|notes" placeholder="Half-formed ideas" aria-label="Scratch notes" ${RO()}>${esc(n.notes)}</textarea></div>`,!!(n.note||n.notes));
+  if(beatsIn.length||clues.length||scenesIn.length)h+=sec("story","In the story",`${scenesIn.length?`<div class="list">${scenesIn.map(x=>`<div class="item"><button class="nm" data-act="scene" data-id="${x.id}">${esc(x.title)}</button><span class="b">${UN.one[0]}${x.beat}</span><span class="rel">${x.pov===id?"point of view":x.loc===id?"location":"in the scene"}</span></div>`).join("")}</div>`:""}${beatsIn.length?`<div class="beatlinks">${beatsIn.map(b=>`<button data-act="beat" data-n="${b}">${UN.one} ${b}</button>`).join("")}</div>`:""}${clues.length?`<div class="list">${clues.map(c=>`<div class="item"><button class="nm" data-act="clue" data-id="${c.id}">${esc(c.name)}</button><span class="b">${c.planted??"?"} → ${c.payoff??"?"}</span></div>`).join("")}</div>`:""}`,false,beatsIn.length+clues.length+scenesIn.length);
+  h+=sec("arc","Character arc",arcOn(n)?`${arcFields(n)}<div class="btns"><button class="btn" data-act="openarc" data-id="${id}">Show on the Arcs board</button>${confirmUI("stoparc-"+id,"Stop tracking this arc and clear its scores?",`stoparcyes" data-id="${id}`)||`<button class="btn" data-act="ask" data-key="stoparc-${id}" ${RO()}>Stop tracking</button>`}</div>`:`<p class="small muted">Track how this character changes over the story: what they want and need, and a score for each ${UN.l1}.</p><button class="btn" data-act="addarc" data-id="${id}" ${RO()}>Track an arc</button>`,arcOn(n));
+  h+=`<div class="btns"><button class="btn" data-act="focusone" data-id="${id}">Focus on this</button>${pinned?`<button class="btn" data-act="unpin" data-id="${id}">Unpin</button>`:""}${confirmUI("del-"+id,"Delete node and its connections?","delnode")||`<button class="btn danger" data-act="ask" data-key="del-${id}" ${RO()}>Delete</button>`}</div>`;
+  return h;
+}
+function linkView(){
+  const l=S.links.get(ui.link);
+  if(!l)return backBtn()+`<p class="muted">Saving…</p>`;
+  const id=l.id,a=S.nodes.get(l.s),b=S.nodes.get(l.t);
+  let h=backBtn()+`<div class="eyebrow">Connection</div>`;
+  h+=`<h2><button class="back" style="font:inherit;color:inherit" data-act="node" data-id="${l.s}">${esc(a?.name)}</button> → <button class="back" style="font:inherit;color:inherit" data-act="node" data-id="${l.t}">${esc(b?.name)}</button></h2>`;
+  h+=draftBox(l,"links",id);
+  h+=`<div><h3>What it means, ${UN.l1} by ${UN.l1}</h3><div class="rows" data-stepwrap="${id}">${(l.steps||[]).map((s,i)=>`<div class="row step"><input class="ed num" type="number" min="0" max="${CONFIG.beatCount}" data-part="b" value="${s.b}" aria-label="${UN.one}" ${RO()}><input class="ed" data-part="text" data-ff="step${i}" value="${esc(s.text)}" aria-label="Label" ${RO()}><button class="x" data-act="delstep" data-i="${i}" ${RO()}>×</button></div>`).join("")}<button class="add" data-act="addstep" ${RO()}>+ Add a later meaning</button></div><p class="small muted">${UN.one} 0 means backstory or world fact. The map shows the latest meaning up to the selected ${UN.l1}.</p></div>`;
+  h+=`<dl class="kv"><dt>Kind</dt><dd><select class="ed" data-save="links|${id}|k" ${RO()}><option value="" ${!l.k?"selected":""}>established</option><option value="herring" ${l.k==="herring"?"selected":""}>red herring</option></select></dd>
+    <dt>${esc(CONFIG.pov)} learns</dt><dd><input class="ed num" type="number" min="0" max="${CONFIG.beatCount}" data-num="links|${id}|m" value="${l.m??""}" placeholder="never" ${RO()}> <span class="small muted">${UN.l1} (blank = never)</span></dd>
+    <dt>${esc(CONFIG.reader)} learns</dt><dd><input class="ed num" type="number" min="0" max="${CONFIG.beatCount}" data-num="links|${id}|r" value="${l.r??""}" placeholder="never" ${RO()}> <span class="small muted">${UN.l1} (blank = never)</span></dd></dl>`;
+  if(!l.draft&&S.scenarios.size)h+=`<div><h3>Cut in a what-if</h3><div class="pills">${[...S.scenarios.values()].map(s=>{const on=(s.cuts||[]).includes(id);return `<button class="pill" style="--c:${ink(s.color)}" data-act="togglecut" data-sc="${s.id}" ${RO()}><span class="sw"></span>${esc(s.name)} ${on?"✓ cut":""}</button>`}).join("")}</div><p class="small muted">A cut link shows red and broken while that what-if is on.</p></div>`;
+  h+=`<div class="btns">${confirmUI("dellink","Delete this connection?","dellink")||`<button class="btn danger" data-act="ask" data-key="dellink" ${RO()}>Delete</button>`}</div>`;
+  return h;
+}
+function beatView(){
+  const b=beatDoc(ui.beatView);if(!b)return backBtn();
+  const id=b.id;
+  const qs=[...S.questions.values()].filter(q=>q.beat===b.n);
+  const planted=[...S.clues.values()].filter(c=>c.planted===b.n),paid=[...S.clues.values()].filter(c=>c.payoff===b.n);
+  const others=[...S.nodes.values()].filter(n=>!inPlay(b).has(n.id)).sort((a,c)=>a.name.localeCompare(c.name));
+  let h=backBtn()+`<div class="eyebrow">${ACTS[b.act]||""} · ${UN.l1} ${b.n} of ${CONFIG.beatCount}</div>`;
+  h+=`<input class="ed title" data-save="beats|${id}|title" data-ff="title" value="${esc(b.title)}" aria-label="${UN.one} title" ${RO()}>`;
+  h+=`<div class="pills"><select class="ed" data-save="beats|${id}|act" aria-label="Act" ${RO()}>${CONFIG.acts.map(([k,l])=>`<option value="${esc(k)}" ${k===b.act?"selected":""}>${esc(l)}</option>`).join("")}${CONFIG.acts.some(a=>a[0]===b.act)?"":`<option value="${esc(b.act||"")}" selected>No act</option>`}</select>${scenesOf(b.n).length?`<span class="small muted">${esc((STATUS.find(x=>x[0]===beatStatus(b))||[])[1]||"")} · ${beatWords(b).toLocaleString("en-GB")} words, from the scenes</span>`:`<select class="ed" data-save="beats|${id}|status" aria-label="Status" ${RO()}>${STATUS.map(([k,l])=>`<option value="${k}" ${(b.status||"idea")===k?"selected":""}>${l}</option>`).join("")}</select><label class="small muted">words <input class="ed num" style="width:6em" type="number" min="0" data-words="beats|${id}" value="${b.words||0}" ${RO()}></label>`}</div>`;
+  const scs=scenesOf(b.n);
+  h+=`<div><h3>Scenes · ${scs.length}<span class="sp"></span><button class="add" data-act="addscene" data-n="${b.n}" ${RO()}>+ Add scene</button></h3>${scs.length?`<div class="list">${scs.map((x,i)=>`<div class="item"><button class="nm" data-act="scene" data-id="${x.id}">${i+1}. ${esc(x.title)}</button><span class="b" title="${esc((STATUS.find(z=>z[0]===(x.status||"idea"))||[])[1]||"")}"><span style="color:${(STATUS.find(z=>z[0]===(x.status||"idea"))||[])[2]}">●</span> ${(+x.words||0).toLocaleString("en-GB")}</span><span class="rel">${[x.pov&&S.nodes.has(x.pov)?nm(x.pov):"",x.loc&&S.nodes.has(x.loc)?"at "+nm(x.loc):"",x.time].filter(Boolean).map(esc).join(" · ")}</span></div>`).join("")}</div>`:`<p class="small muted">Split this ${UN.l1} into scenes to track who is where and what happens.</p>`}</div>`;
+  h+=`<textarea class="ed" rows="3" data-save="beats|${id}|text" aria-label="${UN.one} summary" ${RO()}>${esc(b.text)}</textarea>`;
+  h+=`<div class="box red"><h3>Open questions<span class="sp"></span><button class="add" data-act="addq" data-beat="${b.n}" ${RO()}>+ Add</button></h3>${qs.filter(q=>q.status!=="decided").map(qBlock).join("")||`<p class="small muted">None open.</p>`}${qs.filter(q=>q.status==="decided").map(decidedBlock).join("")}</div>`;
+  h+=`<div><h3>In play</h3><div class="list">${[...inPlay(b)].map(([nid,src])=>nodeItem(nid,src==="manual"?`<button class="x" data-act="beatremove" data-id="${nid}" title="Remove from ${UN.l1}" ${RO()}>×</button>`:`<span class="muted" title="Listed in a scene of this ${UN.l1}">via scene</span>`)).join("")}</div>
+    <select class="ed" data-act-change="beatadd" aria-label="Add to this ${UN.l1}" ${RO()} style="margin-top:6px"><option value="">+ Add someone or something…</option>${others.map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join("")}</select></div>`;
+  const bl=[...S.links.values()].filter(l=>shownDraft(l)&&(l.steps||[]).some(s=>s.b===b.n));
+  if(bl.length)h+=`<div><h3>What changes this ${UN.l1}</h3><div class="list">${bl.map(l=>`<div class="item"><button class="nm" data-act="link" data-id="${l.id}">${esc(nm(l.s))} → ${esc(nm(l.t))}</button><span class="rel">${esc(l.steps.filter(s=>s.b===b.n).map(s=>s.text).join(" · "))}</span></div>`).join("")}</div></div>`;
+  if(planted.length||paid.length)h+=`<div><h3>Clues</h3><div class="list">${planted.map(c=>`<div class="item"><button class="nm" data-act="clue" data-id="${c.id}">${esc(c.name)}</button><span class="b">planted</span></div>`).join("")}${paid.map(c=>`<div class="item"><button class="nm" data-act="clue" data-id="${c.id}">${esc(c.name)}</button><span class="b">pays off</span></div>`).join("")}</div></div>`;
+  const flat=flatGroups(beatGroups());const pos=flat.findIndex(e=>e.oldN===b.n);
+  h+=`<div class="btns"><button class="btn" data-act="beatmove" data-n="${b.n}" data-dir="-1" ${pos>0&&canWrite&&db?"":"disabled"}>← Move earlier</button><button class="btn" data-act="beatmove" data-n="${b.n}" data-dir="1" ${pos>=0&&pos<flat.length-1&&canWrite&&db?"":"disabled"}>Move later →</button>${confirmUI("delbeat-"+id,`Delete this ${UN.l1}?`,`delbeatyes" data-id="${id}`)||`<button class="btn danger" data-act="ask" data-key="delbeat-${id}" ${RO()}>Delete ${UN.l1}</button>`}</div>`;
+  h+=`<div class="beatlinks">${b.n>1?`<button data-act="beat" data-n="${b.n-1}">← ${UN.one} ${b.n-1}</button>`:""}${b.n<CONFIG.beatCount?`<button data-act="beat" data-n="${b.n+1}">${UN.one} ${b.n+1} →</button>`:""}</div>`;
+  return h;
+}
+function clueView(){
+  const c=S.clues.get(ui.clue);if(!c)return backBtn()+`<p class="muted">Saving…</p>`;
+  const id=c.id,fl=clueFlags(c);
+  const others=[...S.nodes.values()].filter(n=>!(c.nodes||[]).includes(n.id)).sort((a,b)=>a.name.localeCompare(b.name));
+  let h=backBtn()+`<div class="eyebrow">Clue ledger</div>`;
+  h+=`<input class="ed title" data-save="clues|${id}|name" data-ff="name" value="${esc(c.name)}" aria-label="Clue name" ${RO()}>`;
+  if(fl.length)h+=`<div class="box red"><h3>Needs attention</h3>${fl.map(f=>`<p class="small">${f}</p>`).join("")}</div>`;
+  h+=`<dl class="kv"><dt>Kind</dt><dd><select class="ed" data-save="clues|${id}|kind" ${RO()}>${["clue","herring","reveal"].map(k=>`<option value="${k}" ${c.kind===k?"selected":""}>${k==="herring"?"red herring":k}</option>`).join("")}</select></dd>
+    <dt>Planted</dt><dd><input class="ed num" type="number" min="1" max="${CONFIG.beatCount}" data-num="clues|${id}|planted" value="${c.planted??""}" placeholder="?" ${RO()}> <span class="small muted">${UN.l1}</span></dd>
+    <dt>Pays off</dt><dd><input class="ed num" type="number" min="1" max="${CONFIG.beatCount}" data-num="clues|${id}|payoff" value="${c.payoff??""}" placeholder="?" ${RO()}> <span class="small muted">${UN.l1}</span></dd></dl>`;
+  h+=`<textarea class="ed ph" rows="2" data-save="clues|${id}|note" placeholder="How it's planted, how it pays off" aria-label="Clue note" ${RO()}>${esc(c.note)}</textarea>`;
+  h+=`<div><h3>Involves</h3><div class="pills">${(c.nodes||[]).map(nid=>{const n=S.nodes.get(nid);return n?`<span class="pill" style="--c:${col(n.t)}"><span class="sw"></span>${esc(n.name)}<button class="x" data-act="cluenoderm" data-id="${nid}" ${RO()}>×</button></span>`:""}).join("")}</div>
+    <select class="ed" data-act-change="clueadd" ${RO()} style="margin-top:6px" aria-label="Add to clue"><option value="">+ Add…</option>${others.map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join("")}</select></div>`;
+  h+=`<div class="btns">${c.planted?`<button class="btn" data-act="beat" data-n="${c.planted}">Go to plant (${UN.one[0]}${c.planted})</button>`:""}${c.payoff?`<button class="btn" data-act="beat" data-n="${c.payoff}">Go to payoff (${UN.one[0]}${c.payoff})</button>`:""}${confirmUI("delclue","Delete this clue?","delclue")||`<button class="btn danger" data-act="ask" data-key="delclue" ${RO()}>Delete</button>`}</div>`;
+  return h;
+}
+function legendRow(svgInner,text){return `<svg width="28" height="14" aria-hidden="true">${svgInner}</svg><span>${text}</span>`}
+function startBox(){
+  if(ui.hideStart)return"";
+  const st=S.settings.get("story")||{};
+  const steps=[
+    [!!st.title,"Name your story","Click the title at the top left.",""],
+    [S.beats.size>0,"Choose a structure",`Pick one to fill in the acts and ${UN.lm}, or press + on an act in the bar below to add your own.`,`<div class="btns">${TEMPLATES.map(t=>`<button class="btn" data-act="tpl" data-id="${t.id}" ${RO()}>${esc(t.name)}</button>`).join("")}</div>`],
+    [S.nodes.size>0,"Add your first node","A character, place, group or idea.",`<div class="btns"><button class="btn neon" data-act="addnode" ${RO()}>+ Node</button></div>`],
+    [S.links.size>0,"Connect two nodes","Open a node and use “+ Connect to…”.",""],
+    [[...S.beats.values()].some(b=>inPlay(b).size>0),`Put a node into a ${UN.l1}`,`Open a ${UN.l1} and add who is in play, or click a cell on the timeline.`,`<div class="btns"><button class="btn" data-act="gotimeline">Open the timeline</button></div>`]
+  ];
+  if(steps.every(x=>x[0]))return"";
+  const left=steps.filter(x=>!x[0]).length;
+  return `<div class="start"><h3>Getting started · ${left} to go<span class="sp"></span><button class="add" data-act="hidestart">Hide</button></h3>${steps.map(([done,t,d,extra])=>`<div class="step ${done?"done":""}"><span class="tick">${done?"✓":"○"}</span><b>${t}</b>${done?"":`<div class="more"><span class="small muted">${d}</span>${extra}</div>`}</div>`).join("")}</div>`;
+}
+function storyTab(){
+  const lensHelp=Object.fromEntries(LENSES.map(l=>[l[0],l[2]]));
+  return `${CONFIG.intro.eyebrow?`<div class="eyebrow">${esc(CONFIG.intro.eyebrow)}</div>`:""}<h2>${esc(CONFIG.intro.heading)}</h2>
+  ${startBox()}${progressBox()}
+  <div class="box"><h3>${esc(LENSES.find(l=>l[0]===ui.lens)[1])} view</h3><p class="small">${esc(lensHelp[ui.lens])}</p></div>
+  <div class="box"><h3>Story notes<span class="sp"></span><button class="add" data-act="addbg" ${RO()}>+ Add line</button></h3>${CONFIG.bgRaw&&CONFIG.bgRaw.length?bgRows():`<p class="small muted">Setting, era, rules of your world. Add anything you want to keep in view.</p>`}</div>`;
+}
+function helpTab(){
+  return `<div class="eyebrow">Help</div><h2>How this works</h2>
+  <p>Click anything to open and edit it. Every change saves straight away, and <b>Changes</b> keeps a history you can undo.</p>
+  <div><h3>The four views</h3><dl class="kv">${LENSES.map(l=>`<dt>${esc(l[1])}</dt><dd>${esc(l[2])}</dd>`).join("")}</dl><p class="small muted">Pick a ${UN.l1} in the bar below and anything not yet known in that view fades out. Double-click the viewpoint or reader tab to rename it.</p></div>
+  <div><h3>On the web</h3><div class="legend">
+   ${legendRow(`<line x1="2" y1="7" x2="26" y2="7" style="stroke:var(--line-2)" stroke-width="1.6"/>`,"Canon connection")}
+   ${legendRow(`<line x1="2" y1="7" x2="26" y2="7" style="stroke:var(--herring)" stroke-width="2" stroke-dasharray="1.5 4" stroke-linecap="round"/>`,"Red herring")}
+   ${legendRow(`<line x1="2" y1="7" x2="26" y2="7" stroke="#ff2bd6" stroke-width="1.8" stroke-dasharray="6 4"/>`,"Draft from a what-if (each has its own neon)")}
+   ${legendRow(`<line x1="2" y1="7" x2="26" y2="7" style="stroke:var(--open)" stroke-width="1.6" stroke-dasharray="2 6"/>`,"Canon cut by a what-if")}
+   ${legendRow(`<circle cx="14" cy="7" r="5" style="fill:var(--open)"/>`,"Open question")}
+   ${legendRow(`<circle cx="14" cy="7" r="3" style="fill:var(--fg)"/>`,"Pinned where you dropped it")}
+  </div></div>
+  <div><h3>${UN.one} status</h3><div class="pills">${STATUS.map(([k,l,c])=>`<span class="pill" style="--c:${c}"><span class="sw"></span>${l}</span>`).join("")}</div><p class="small muted">The coloured line under each ${UN.l1} number in the bottom bar.</p></div>
+  <dl class="kv"><dt>Move</dt><dd>Drag a node and it stays put. Double-click to let it go.</dd><dt>Connect</dt><dd>Open a node and use “+ Connect to…”, or drag the pink handle onto another node.</dd><dt>Focus</dt><dd>Shift-click a few nodes, then hit Focus.</dd><dt>${UN.many}</dt><dd>Click a ${UN.l1} below. Arrow keys step through. Drag to reorder.</dd><dt>Timeline</dt><dd>Switch at the top of the board. Click a cell to put a node into a ${UN.l1}.</dd><dt>Look</dt><dd>The ◐ button at the top right changes the colours.</dd></dl>`;
+}
+function questionsTab(){
+  const oq=openQs(),dq=[...S.questions.values()].filter(q=>q.status==="decided").sort((a,b)=>(b.decidedAt||0)-(a.decidedAt||0));
+  const grp=q=>q.node?nm(q.node):`${UN.one} ${q.beat}`;
+  let h=`<div class="eyebrow">Open questions · ${oq.length}</div><h2>Still to decide</h2>`;
+  h+=oq.length?`<div class="box red">${oq.sort((a,b)=>grp(a).localeCompare(grp(b))).map(q=>{
+    const head=q.node?`<button class="back" data-act="node" data-id="${q.node}">${esc(nm(q.node))}</button>`:`<button class="back" data-act="beat" data-n="${q.beat}">${UN.one} ${q.beat}</button>`;
+    return `<div class="q">${head}${qBlock({...q,beat:null})}</div>`}).join("")}</div>`:`<div class="empty">Nothing open. Add questions from any node or ${UN.l1}.</div>`;
+  if(dq.length)h+=`<div><h3>Decided</h3><div class="list">${dq.map(decidedBlock).join("")}</div></div>`;
+  return h;
+}
+function cluesTab(){
+  const cs=[...S.clues.values()].sort((a,b)=>(a.planted??a.payoff??0)-(b.planted??b.payoff??0));
+  const flagged=cs.filter(c=>clueFlags(c).length);
+  const row=c=>`<div class="item"><button class="nm" data-act="clue" data-id="${c.id}">${esc(c.name)} ${c.kind==="herring"?`<span class="tag hr">herring</span>`:c.kind==="reveal"?`<span class="tag">reveal</span>`:""}</button><span class="b">${c.planted??"?"} → ${c.payoff??"?"}</span>${clueFlags(c).length?`<span class="rel" style="color:var(--open)">${clueFlags(c).join(" · ")}</span>`:""}</div>`;
+  let h=`<div class="eyebrow">Clue ledger · ${cs.length}</div><h2>Setups and payoffs</h2><p class="small muted">Every clue, red herring and reveal, from the ${UN.l1} it's planted to the ${UN.l1} it pays off. Click one to light up its path.</p>`;
+  if(flagged.length)h+=`<div class="box red"><h3>Needs attention · ${flagged.length}</h3><div class="list">${flagged.map(row).join("")}</div></div>`;
+  h+=`<div><h3>All clues<span class="sp"></span><button class="add" data-act="addclue" ${RO()}>+ Add clue</button></h3><div class="list">${cs.map(row).join("")}</div></div>`;
+  return h;
+}
+function whatifsTab(){
+  const ss=[...S.scenarios.values()].sort((a,b)=>(a.created||0)-(b.created||0));
+  let h=`<div class="eyebrow">What-ifs · ${ss.length}</div><h2>Ideas you haven't committed to</h2><p class="small muted">Turn on <b>Draft into this</b>, then add nodes or drag connections as usual: they land as drafts in that what-if. Make canon when it sticks, bin it when it doesn't.</p>`;
+  h+=`<div class="btns"><button class="btn neon" data-act="newsc" ${RO()}>+ New what-if</button></div>`;
+  if(!ss.length)h+=`<div class="empty">No what-ifs yet.</div>`;
+  ss.forEach(s=>{
+    const id=s.id,c=ink(s.color||NEON[0]);const shown=!ui.hidden.has(id),drafting=ui.draftInto===id;
+    const nN=[...S.nodes.values()].filter(n=>n.draft===id).length,nL=[...S.links.values()].filter(l=>l.draft===id).length,nC=(s.cuts||[]).length;
+    h+=`<div class="sc ${shown?"on":""}" style="--sc:${c}">
+      <input class="ed" style="font-weight:600;color:${c}" data-save="scenarios|${id}|name" data-ff="sc-${id}" value="${esc(s.name)}" aria-label="What-if name" ${RO()}>
+      <textarea class="ed small ph" rows="1" data-save="scenarios|${id}|desc" placeholder="What changes in this version?" aria-label="Description" ${RO()}>${esc(s.desc)}</textarea>
+      <span class="meta">${nN} draft node${nN===1?"":"s"} · ${nL} draft connection${nL===1?"":"s"} · ${nC} cut</span>
+      <div class="btns"><button class="btn ${shown?"neon":""}" data-act="togglesc" data-id="${id}" aria-pressed="${shown}">${shown?"Showing":"Hidden"}</button>
+      <button class="btn ${drafting?"neon":""}" data-act="draftinto" data-id="${id}" aria-pressed="${drafting}" ${RO()}>${drafting?"Drafting into this":"Draft into this"}</button></div>
+      <div class="btns">${confirmUI("canon-"+id,"Make all of it canon?",`canonsc" data-id="${id}`)||confirmUI("binsc-"+id,"Bin this what-if and its drafts?",`binsc" data-id="${id}`)||`<button class="btn" data-act="ask" data-key="canon-${id}" ${RO()}>Make canon</button><button class="btn ghost" data-act="ask" data-key="binsc-${id}" ${RO()}>Bin</button>`}</div>
+      ${nN+nL?`<div class="list">${[...S.nodes.values()].filter(n=>n.draft===id).map(n=>nodeItem(n.id)).join("")}${[...S.links.values()].filter(l=>l.draft===id).map(l=>`<div class="item"><button class="nm" data-act="link" data-id="${l.id}">${esc(nm(l.s))} → ${esc(nm(l.t))}</button><span class="rel">${esc(l.steps?.[0]?.text||"")}</span></div>`).join("")}</div>`:""}
+    </div>`});
+  return h;
+}
+function changesTab(){
+  const all=[...S.changes.values()].sort((a,b)=>b.at-a.at).slice(0,150);
+  const fields=c=>{const out=[];c.items.forEach(it=>{const b=it.before||{},a=it.after||{};const ks=[...new Set([...Object.keys(a),...Object.keys(b)])].filter(k=>!["x","y","pinned"].includes(k)&&JSON.stringify(a[k])!==JSON.stringify(b[k]));
+    const who=it.coll==="nodes"?(a.name||b.name):it.coll==="beats"?`${UN.one} ${a.n||b.n}`:it.coll==="links"?"connection":it.coll.replace(/s$/,"");
+    out.push(!it.before?`${who}: created`:!it.after?`${who}: deleted`:`${who}: ${ks.join(", ")||"no change"}`)});return out.join(" · ")};
+  let h=`<div class="eyebrow">Changes</div><h2>History</h2><p class="small muted">Everything you change on the web is listed here. Most changes can be undone.</p>`;
+  h+=`<div><h3>History</h3>${all.length?`<div class="list">${all.map(c=>`<div class="ch ${c.undone?"undone":""}"><span class="what">${esc(c.summary)}${c.draft?` <span class="tag neon" style="--sc:var(--accent)">draft</span>`:""}</span>${c.undone?`<span class="tag">undone</span>`:canUndo(c)?`<button class="btn ghost" data-act="undo" data-id="${c.id}" ${RO()}>Undo</button>`:`<span class="tag" title="Changed again since">edited since</span>`}<span class="when">${fmtDate(c.at)}</span></div>`).join("")}</div>`:`<div class="empty">No changes yet. Everything you edit shows up here with an undo.</div>`}</div>`;
+  return h;
+}
+
+/* ============ panel events ============ */
+P.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.typecolorkey){const arr=typesOut();const ty=arr.find(x=>x.key===t.dataset.typecolorkey);if(ty){ty.color=t.value;saveSettings({types:arr},"Edited node types")}return}
+  if(t.dataset.words){const [c,id]=t.dataset.words.split("|");const cur=S[c].get(id);if(cur)patch(c,id,{words:Math.max(0,Math.round(+t.value)||0)},c==="scenes"?`Scene "${cur.title}": word count`:`${UN.one} ${cur.n}: word count`);return}
+  if(t.dataset.save&&t.value==="__new"){ui.newType=true;ui.focusField="ntname";renderPanel(true);return}
+  const bw=t.closest("[data-bgwrap]");
+  if(bw){const rows=[...bw.querySelectorAll(".row")].map(r=>({k:r.querySelector("[data-part=k]").value,v:r.querySelector("[data-part=v]").value}));saveSettings({background:rows},"Edited story notes");return}
+  if(t.dataset.typename!=null||t.dataset.typecolor!=null){
+    const i=+(t.dataset.typename??t.dataset.typecolor);const arr=typesOut();if(!arr[i])return;
+    if(t.dataset.typename!=null)arr[i].name=t.value.trim()||"Untitled type";else arr[i].color=t.value;
+    saveSettings({types:arr},"Edited node types");return}
+  if(t.dataset.save){const [c,id,f]=t.dataset.save.split("|");const cur=S[c].get(id);if(!cur)return;
+    const label=c==="nodes"?cur.name:c==="beats"?`${UN.one} ${cur.n}`:c==="clues"?cur.name:c==="scenes"?cur.title:c==="scenarios"?cur.name:c==="questions"?"question":`${nm(cur.s)} → ${nm(cur.t)}`;
+    patch(c,id,{[f]:t.value},`Edited ${label}: ${f==="sum"?"summary":f==="t"?"type":f==="k"?"kind":f}`);return}
+  if(t.dataset.num){const [c,id,f]=t.dataset.num.split("|");const cur=S[c].get(id);if(!cur)return;
+    patch(c,id,{[f]:bnum(t.value)},`Edited ${cur.name||(c==="links"?`${nm(cur.s)} → ${nm(cur.t)}`:"")}: ${({m:CONFIG.pov+" learns",r:CONFIG.reader+" learns",beat:"first seen"})[f]||f}`);return}
+  if(t.dataset.bool){const [c,id,f]=t.dataset.bool.split("|");const cur=S[c].get(id);patch(c,id,{[f]:t.checked},`Edited ${cur.name}: ${f}`);return}
+  if(t.dataset.bkfile!=null){if(t.files&&t.files[0])bkImport(t.files[0]);t.value="";return}
+  if(t.dataset.arc){saveArcField(t);return}
+  if(t.dataset.setting){saveSettings({[t.dataset.setting]:t.dataset.setting==="target"?Math.max(0,Math.round(+t.value)||0):t.value},"Edited story settings");return}
+  if(t.dataset.acts!=null){const i=+t.dataset.acts;saveSettings({acts:actsOut(CONFIG.acts.map((a,j)=>j===i?[a[0],t.value||"Untitled act"]:a))},"Renamed an act");return}
+  const lw=t.closest("[data-listwrap]");
+  if(lw){const [c,id,f]=lw.dataset.listwrap.split("|");const rows=[...lw.querySelectorAll(".row")].map(r=>({k:r.querySelector("[data-part=k]").value,v:r.querySelector("[data-part=v]").value}));patch(c,id,{[f]:rows},`Edited ${S[c].get(id)?.name}: ${f==="f"?"profile":"over time"}`);return}
+  const sw=t.closest("[data-stepwrap]");
+  if(sw){const id=sw.dataset.stepwrap;const l=S.links.get(id);const steps=[...sw.querySelectorAll(".row")].map(r=>({b:bnum(r.querySelector("[data-part=b]").value)??0,text:r.querySelector("[data-part=text]").value})).sort((a,b)=>a.b-b.b);
+    patch("links",id,{steps},`Edited ${nm(l.s)} → ${nm(l.t)}: label`);return}
+  if(t.dataset.actChange==="scenecastadd"&&t.value){const sc=S.scenes.get(ui.scene);if(sc)patch("scenes",sc.id,{cast:[...(sc.cast||[]),t.value]},`Scene "${sc.title}": added ${nm(t.value)}`);return}
+  if(t.dataset.bsel){const [c,id]=t.dataset.bsel.split("|");const cur=S[c].get(id);if(cur){const nb=+t.value;patch(c,id,{beat:nb,order:scenesOf(nb).length},`Moved scene "${cur.title}" to ${UN.l1} ${nb}`)}return}
+  if(t.dataset.actChange==="connectto"&&t.value){createLink(ui.sel,t.value);return}
+  if(t.dataset.actChange==="beatadd"&&t.value){const b=beatDoc(ui.beatView);patch("beats",b.id,{ids:[...(b.ids||[]),t.value]},`${UN.one} ${b.n}: added ${nm(t.value)}`);return}
+  if(t.dataset.actChange==="clueadd"&&t.value){const c=S.clues.get(ui.clue);patch("clues",c.id,{nodes:[...(c.nodes||[]),t.value]},`${c.name}: added ${nm(t.value)}`);return}
+});
+P.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-act]");if(!t||t.disabled)return;
+  const a=t.dataset.act,id=t.dataset.id;
+  switch(a){
+    case "back":ui.view="tab";ui.confirm=null;renderPanel(true);paint();break;
+    case "node":openNode(id);break;
+    case "link":openLink(id);break;
+    case "beat":openBeat(+t.dataset.n);break;
+    case "clue":openClue(id);break;
+    case "ask":ui.confirm=t.dataset.key;renderPanel(true);break;
+    case "cancel":ui.confirm=null;renderPanel(true);break;
+    case "focusone":ui.focus=new Set([id]);renderTools();paint();setTimeout(()=>fit(),30);break;
+    case "unpin":{const o=simMap.get(id);if(o){o.localPin=false;o.fx=null;o.fy=null;sim.alpha(.2).restart()}if(db&&canWrite)db.doc("nodes/"+id).update({pinned:false}).catch(handleErr);renderPanel(true);break}
+    case "addrow":{const lw=t.closest("[data-listwrap]");const [c,nid,f]=lw.dataset.listwrap.split("|");const cur=S[c].get(nid);patch(c,nid,{[f]:[...(cur[f]||[]),{k:"",v:""}]},`Edited ${cur.name}: added a line`);break}
+    case "delrow":{const lw=t.closest("[data-listwrap]");const [c,nid,f]=lw.dataset.listwrap.split("|");const cur=S[c].get(nid);const rows=[...(cur[f]||[])];rows.splice(+t.dataset.i,1);patch(c,nid,{[f]:rows},`Edited ${cur.name}: removed a line`);break}
+    case "addstep":{const l=S.links.get(ui.link);const last=(l.steps||[]).slice(-1)[0];patch("links",l.id,{steps:[...(l.steps||[]),{b:Math.min(CONFIG.beatCount,(last?.b||0)+1),text:"later meaning"}]},`Edited ${nm(l.s)} → ${nm(l.t)}: added a meaning`);break}
+    case "delstep":{const l=S.links.get(ui.link);if((l.steps||[]).length<2){toast("A connection needs at least one meaning.");break}const st=[...l.steps];st.splice(+t.dataset.i,1);patch("links",l.id,{steps:st},`Edited ${nm(l.s)} → ${nm(l.t)}: removed a meaning`);break}
+    case "delnode":{const n=S.nodes.get(ui.sel);const items=[...S.links.values()].filter(l=>l.s===n.id||l.t===n.id).map(l=>({coll:"links",id:l.id,after:null}));items.push({coll:"nodes",id:n.id,after:null});
+      S.beats.forEach(b=>{if((b.ids||[]).includes(n.id))items.push({coll:"beats",id:b.id,after:{...strip(b),ids:b.ids.filter(x=>x!==n.id)}})});
+      S.arcpts.forEach(x=>{if(x.node===n.id)items.push({coll:"arcpts",id:x.id,after:null})});
+      S.scenes.forEach(sc=>{const had=sc.pov===n.id||sc.loc===n.id||(sc.cast||[]).includes(n.id);if(had)items.push({coll:"scenes",id:sc.id,after:{...strip(sc),pov:sc.pov===n.id?"":sc.pov,loc:sc.loc===n.id?"":sc.loc,cast:(sc.cast||[]).filter(x=>x!==n.id)}})});
+      ui.confirm=null;ui.view="tab";await commit(`Deleted ${n.name}`,items);break}
+    case "dellink":{const l=S.links.get(ui.link);ui.confirm=null;ui.view="tab";await commit(`Deleted connection ${nm(l.s)} → ${nm(l.t)}`,[{coll:"links",id:l.id,after:null}]);break}
+    case "addq":{const qid=newId("q");const doc={node:t.dataset.node||null,beat:t.dataset.beat?+t.dataset.beat:null,text:"New question",status:"open",decision:"",decidedAt:null};
+      await commit(`Added question to ${doc.node?nm(doc.node):UN.one+" "+doc.beat}`,[{coll:"questions",id:qid,after:doc}]);ui.editQ=qid;break}
+    case "decide":ui.deciding=id;ui.focusField="decision";renderPanel(true);break;
+    case "canceldecide":ui.deciding=null;renderPanel(true);break;
+    case "savedecision":{const v=($("dec-"+id)||{}).value||"";if(!v.trim()){toast("Write the decision first.");break}const q=S.questions.get(id);ui.deciding=null;
+      await patch("questions",id,{status:"decided",decision:v.trim(),decidedAt:Date.now()},`Decided: ${q.text.slice(0,80)} → ${v.trim().slice(0,120)}`);break}
+    case "reopen":{const q=S.questions.get(id);await patch("questions",id,{status:"open",decidedAt:null},`Reopened: ${q.text.slice(0,80)}`);break}
+    case "beatremove":{const b=beatDoc(ui.beatView);patch("beats",b.id,{ids:(b.ids||[]).filter(x=>x!==id)},`${UN.one} ${b.n}: removed ${nm(id)}`);break}
+    case "cluenoderm":{const c=S.clues.get(ui.clue);patch("clues",c.id,{nodes:(c.nodes||[]).filter(x=>x!==id)},`${c.name}: removed ${nm(id)}`);break}
+    case "addclue":{const cid=newId("c");ui.view="clue";ui.clue=cid;ui.focusField="name";await commit("Added clue",[{coll:"clues",id:cid,after:{name:"New clue",kind:"clue",planted:ui.beat,payoff:null,nodes:ui.sel?[ui.sel]:[],note:""}}]);break}
+    case "delclue":{const c=S.clues.get(ui.clue);ui.confirm=null;ui.view="tab";ui.tab="clues";await commit(`Deleted clue: ${c.name}`,[{coll:"clues",id:c.id,after:null}]);break}
+    case "newsc":{const sid=newId("sc");const used=new Set([...S.scenarios.values()].map(s=>s.color));const color=NEON.find(c=>!used.has(c))||NEON[S.scenarios.size%NEON.length];
+      ui.focusField="sc-"+sid;await commit("New what-if",[{coll:"scenarios",id:sid,after:{name:"Untitled what-if",desc:"",color,cuts:[],created:Date.now()}}],{draft:true});break}
+    case "togglesc":ui.hidden.has(id)?ui.hidden.delete(id):ui.hidden.add(id);if(ui.hidden.has(id)&&ui.draftInto===id)ui.draftInto=null;savePref();rebuild();renderAll();break;
+    case "draftinto":ui.draftInto=ui.draftInto===id?null:id;if(ui.draftInto)ui.hidden.delete(id);savePref();rebuild();renderAll();break;
+    case "togglecut":{const s=scen(t.dataset.sc);const cuts=new Set(s.cuts||[]);cuts.has(ui.link)?cuts.delete(ui.link):cuts.add(ui.link);patch("scenarios",s.id,{cuts:[...cuts]},`${s.name}: ${cuts.has(ui.link)?"cut":"restored"} a connection`);break}
+    case "canonitem":{const c=t.dataset.coll,x=S[c].get(id);await patch(c,id,{draft:null},`Made canon: ${c==="nodes"?x.name:nm(x.s)+" → "+nm(x.t)}`);break}
+    case "binitem":{const c=t.dataset.coll,x=S[c].get(id);const items=[{coll:c,id,after:null}];if(c==="nodes")S.links.forEach(l=>{if(l.s===id||l.t===id)items.unshift({coll:"links",id:l.id,after:null})});ui.confirm=null;ui.view="tab";ui.tab="whatifs";
+      await commit(`Binned draft: ${c==="nodes"?x.name:nm(x.s)+" → "+nm(x.t)}`,items);break}
+    case "canonsc":{const s=scen(id);const items=[];S.nodes.forEach(n=>{if(n.draft===id)items.push({coll:"nodes",id:n.id,after:{...strip(n),draft:null}})});S.links.forEach(l=>{if(l.draft===id)items.push({coll:"links",id:l.id,after:{...strip(l),draft:null}})});
+      (s.cuts||[]).forEach(c=>{if(S.links.has(c))items.push({coll:"links",id:c,after:null})});items.push({coll:"scenarios",id,after:null});ui.confirm=null;if(ui.draftInto===id)ui.draftInto=null;savePref();
+      await commit(`Made canon: what-if "${s.name}"`,items,{draft:false});break}
+    case "binsc":{const s=scen(id);const items=[];S.links.forEach(l=>{if(l.draft===id)items.push({coll:"links",id:l.id,after:null})});S.nodes.forEach(n=>{if(n.draft===id)items.push({coll:"nodes",id:n.id,after:null})});items.push({coll:"scenarios",id,after:null});ui.confirm=null;if(ui.draftInto===id)ui.draftInto=null;savePref();
+      await commit(`Binned what-if "${s.name}"`,items,{draft:true});break}
+    case "addact":{const used=new Set(CONFIG.acts.map(a=>a[0]));let k=1;while(used.has(String(k)))k++;await saveSettings({acts:actsOut([...CONFIG.acts,[String(k),"New act"]])},"Added an act");break}
+    case "delact":{const i=+t.dataset.i;const [k,l]=CONFIG.acts[i]||[];if(beatsSorted().some(b=>b.act===k)){toast(`Move the ${UN.lm} out of this act first.`);break}await saveSettings({acts:actsOut(CONFIG.acts.filter((_,j)=>j!==i))},`Removed act: ${l}`);break}
+    case "addbeat":await addBeat(CONFIG.acts[0]?.[0]);break
+    case "delbeatyes":await deleteBeat(id);break
+    case "beatmove":await moveBeatStep(+t.dataset.n,+t.dataset.dir);break
+    case "addbg":await saveSettings({background:[...(CONFIG.bgRaw||[]),{k:"",v:""}]},"Added a story note");break
+    case "delbg":await saveSettings({background:(CONFIG.bgRaw||[]).filter((_,j)=>j!==+t.dataset.i)},"Removed a story note");break
+    case "addtype":{const used=new Set(Object.values(TYPES).map(v=>v.color));const color=TYPE_PALETTE.find(c=>!used.has(c))||TYPE_PALETTE[0];await saveSettings({types:[...typesOut(),{key:newId("t"),name:"New type",color}]},"Added a node type");break}
+    case "deltype":{const i=+t.dataset.i;const arr=typesOut();const ty=arr[i];if(!ty)break;if(arr.length<2){toast("Keep at least one node type.");break}
+      if([...S.nodes.values()].some(n=>n.t===ty.key)){toast("Some nodes use this type. Change their type first.");break}
+      await saveSettings({types:arr.filter((_,j)=>j!==i)},`Removed node type: ${ty.name}`);break}
+    case "savetype":{const name=(($("nt-name")||{}).value||"").trim();if(!name){toast("Give the type a name.");break}
+      const color=($("nt-color")||{}).value||TYPE_PALETTE[0];const key=newId("t");const nid=ui.sel;ui.newType=false;
+      if(await saveSettings({types:[...typesOut(),{key,name,color}]},`Added node type: ${name}`))await patch("nodes",nid,{t:key},`Edited ${nm(nid)}: type`);break}
+    case "canceltype":ui.newType=false;renderPanel(true);break;
+    case "bkexport":bkExport();break;
+    case "bkimport":P.querySelector("[data-bkfile]")?.click();break;
+    case "addarc":addArc(id);break;
+    case "openarc":openArc(id);break;
+    case "stoparcyes":stopArc(id);break;
+    case "scene":openScene(id);break;
+    case "addscene":addScene(+t.dataset.n);break;
+    case "scenemove":moveScene(id,+t.dataset.dir);break;
+    case "delsceneyes":deleteScene(id);break;
+    case "scenecastrm":{const sc=S.scenes.get(ui.scene);if(sc)patch("scenes",sc.id,{cast:(sc.cast||[]).filter(x=>x!==id)},`Scene "${sc.title}": removed ${nm(id)}`);break}
+    case "tpl":await applyTemplate(t.dataset.id);break;
+    case "addnode":addNode();break;
+    case "gotimeline":ui.board="timeline";savePref();renderTools();paint();break;
+    case "hidestart":ui.hideStart=true;savePref();renderPanel(true);break;
+    case "undo":await undo(id);break;
+  }
+});
+
+/* ============ render all & data ============ */
+let raf=0;
+function schedule(){if(raf||ui.busy)return;raf=requestAnimationFrame(()=>{raf=0;if(loaded.size<COLLS.length)return;applySettings();renderLens();renderChips();$("boardmsg").hidden=S.nodes.size>0;if(!S.nodes.size)$("boardmsg").textContent="Nothing on the web yet. Press + Node to add a character, place or idea. The checklist on the Story tab will guide you.";rebuild();renderTools();renderPanel()})}
+function renderAll(){renderLens();renderChips();renderTools();renderPanel(true);paint()}
+renderLens();renderChips();renderTools();renderPanel(true);
+(async()=>{
+  const c=window.claude;
+  try{db=c&&c.use?await c.use("db"):null}catch(e){db=null}
+  if(!db){db=makeLocalDb();isLocal=true}
+  if(!isLocal)try{const user=await c.use("user");const w=user&&user.can?await user.can("data.write"):null;canWrite=w!==false}catch(e){}
+  COLLS.forEach(name=>{
+    db.collection(name).onSnapshot(snap=>{const m=new Map();snap.docs.forEach(d=>m.set(d.id,{id:d.id,...d.data()}));S[name]=m;loaded.add(name);schedule()},
+      err=>{loaded.add(name);if(err&&err.code==="revoked"){canWrite=false}toast("Lost the live connection to the story data. Reload to reconnect.")});
+  });
+})();
+let rsz=0;window.addEventListener("resize",()=>{clearTimeout(rsz);rsz=setTimeout(()=>fit(),500);sim.force("x").x(o=>W()*clusterOf(o.d.t)[0]);sim.force("y").y(o=>H()*clusterOf(o.d.t)[1]);if(simNodes.length)sim.alpha(.2).restart()});
+</script>
+
+</body></html>
