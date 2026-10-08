@@ -1069,7 +1069,7 @@ function renderArcs(){
   const cc=id=>ARC_COLS[tracked.findIndex(n=>n.id===id)%ARC_COLS.length];
   let h=`<div class="arcs"><div class="arcbar">${tracked.map(n=>`<button class="chip" data-arcsel="${n.id}" style="--c:${cc(n.id)}" aria-pressed="${n.id===ui.arcSel}"><span class="sw"></span>${esc(n.name)}</button>`).join("")}<select class="ed" data-arcadd aria-label="Track a character's arc" ${RO()}><option value="">+ Track a character…</option>${untracked.map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join("")}</select></div>`;
   if(!tracked.length){el.innerHTML=h+`<div class="empty" style="position:static;padding:24px 4px">${all.length?`Pick a character above to start their arc. You score where they stand in each ${UN.l1}, and the lines show how they change.`:`Add a character with + Node first, then come back to track their arc.`}</div></div>`;return}
-  const sel=S.nodes.get(ui.arcSel),L=70,colW=38,T=24,rowH=22,B=44,W=L+bs.length*colW+10,H=T+11*rowH+B;
+  const sel=S.nodes.get(ui.arcSel),L=70,colW=Math.max(38,Math.min(90,Math.floor(((el.clientWidth||600)-34-L-10)/bs.length))),T=24,rowH=22,B=44,W=L+bs.length*colW+10,H=T+11*rowH+B;
   const x=i=>L+i*colW+colW/2,y=v=>T+(5-v)*rowH+rowH/2,idx=new Map(bs.map((b,i)=>[b.n,i]));
   let g=`<svg class="arcsvg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Character arcs chart">`;
   for(let v=5;v>=-5;v--)g+=`<line x1="${L}" x2="${W-10}" y1="${y(v)}" y2="${y(v)}" class="${v===0?"zero":"grid"}"/>`;
