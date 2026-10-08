@@ -4,7 +4,7 @@
 Map your characters, places and secrets. Plan every chapter and scene. Chart how your characters change.</p>
 
 <p align="center">
-<a href="https://YOURNAME.github.io/story-webber/"><b>▶ Open Story Webber</b></a>
+<a href="https://Sermontagu.github.io/story-webber/"><b>▶ Open Story Webber</b></a>
 &nbsp;·&nbsp; No sign-up &nbsp;·&nbsp; Free &nbsp;·&nbsp; Your story never leaves your device
 </p>
 
